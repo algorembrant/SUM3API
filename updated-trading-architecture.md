@@ -1,6 +1,6 @@
 # MT5 ZeroMQ Trading System - Architecture Diagram
 
-This diagram illustrates the complete data flow and component integration of the MT5-Chart trading system with **bidirectional ZeroMQ communication** for real-time tick data and order execution.
+This diagram illustrates the complete data flow and component integration of the MT5-Chart trading system with **bidirectional ZeroMQ communication** for real-time tick data, order execution, and full trade management.
 
 ## System Overview
 
@@ -28,8 +28,8 @@ flowchart TB
         Main["main.rs"]
         
         subgraph UIComponents["UI Components"]
-            TradingPanel["Trading Panel<br/>• Account Info<br/>• Lot Size Adjuster<br/>• Order Buttons"]
-            PriceChart["Price Chart<br/>• Bid/Ask Lines<br/>• Real-time Update"]
+            TradingPanel["Trading Panel<br/>• Account Info<br/>• Lot Size Adjuster<br/>• Trade Management"]
+            PriceChart["Price Chart<br/>• Time-based X-Axis<br/>• Order Visuals"]
             VolumeChart["Volume Chart<br/>• Tick Volume Bars"]
         end
         
@@ -50,8 +50,8 @@ flowchart TB
     end
 
     subgraph Network["ZeroMQ Transport"]
-        PUBSocket["PUB Socket<br/>tcp://127.0.0.1:5555<br/>(Tick Data + Account Info)"]
-        REPSocket["REP Socket<br/>tcp://127.0.0.1:5556<br/>(Order Handling)"]
+        PUBSocket["PUB Socket<br/>tcp://127.0.0.1:5555<br/>(Tick Data + Account + Positions)"]
+        REPSocket["REP Socket<br/>tcp://127.0.0.1:5556<br/>(Order Execution & Management)"]
     end
 
     LibZmq -->|"PUB Bind"| PUBSocket
@@ -80,36 +80,37 @@ sequenceDiagram
     Note over MT5,GUI: Runtime - Tick Data Flow (Continuous)
     loop Every Market Tick
         MT5->>EA: OnTick()
-        EA->>EA: Get tick data + account info
+        EA->>EA: Get tick + positions + orders
         EA->>PUB: Publish JSON
         PUB->>Rust: Receive tick data
-        Rust->>GUI: Update charts & account display
+        Rust->>GUI: Update X-Axis (Time) & Order Visuals
     end
 
-    Note over MT5,GUI: Order Execution Flow (On User Action)
+    Note over MT5,GUI: Order Execution (User Action)
     GUI->>Rust: User clicks BUY/SELL
-    Rust->>REP: Send order request JSON
+    Rust->>REP: Send request {"type":"market_buy", ...}
     REP->>EA: Receive order request
     EA->>MT5: Execute trade (CTrade)
-    MT5-->>EA: Trade result
-    EA->>REP: Send response JSON
+    MT5-->>EA: Trade result (ticket)
+    EA->>REP: Send response {"success":true, "ticket":123...}
     REP->>Rust: Receive response
-    Rust->>GUI: Display order result
+    Rust->>GUI: Display outcome
 
     Note over MT5,GUI: Trade Management (Cancel/Close)
-    GUI->>Rust: User clicks Close/Cancel
-    Rust->>REP: Send {"type": "close_position" | "cancel_order", "ticket": ...}
+    GUI->>Rust: User clicks 'X' on Position/Order
+    Rust->>REP: Send {"type":"close_position", "ticket":123...}
     REP->>EA: Process Request
-    EA->>MT5: PositionClose / OrderDelete
+    EA->>MT5: PositionClose()
     MT5-->>EA: Result
-    EA->>REP: Success/Fail Response
-    REP->>Rust: Update UI (Position removed from list on next tick)
+    EA->>REP: Success Response
+    REP->>Rust: Update Status
+    Note right of Rust: Position disappears from chart on next tick
 ```
 
 ## Data Structures
 
 ### Tick Data JSON (PUB → SUB)
-
+Updated to include active positions and pending orders for chart visualization.
 ```json
 {
     "symbol": "XAUUSD",
@@ -134,128 +135,71 @@ sequenceDiagram
 ```
 
 ### Order Request JSON (REQ → REP)
-
+Supported request `type`s now include close/cancel actions.
 ```json
 {
-    "type": "market_buy",
+    "type": "close_position",
     "symbol": "XAUUSD",
-    "volume": 0.01,
-    "price": 0.0
+    "volume": 0.0,
+    "price": 0.0,
+    "ticket": 12345
 }
 ```
 
-**Order Types:**
-| Type | Description |
-|------|-------------|
-| `market_buy` | Instant buy at market price |
-| `market_sell` | Instant sell at market price |
-| `limit_buy` | Pending buy limit order |
-| `limit_sell` | Pending sell limit order |
-| `stop_buy` | Pending buy stop order |
-| `stop_sell` | Pending sell stop order |
-| `close_position` | Close an active position (requires `ticket`) |
-| `cancel_order` | Delete a pending order (requires `ticket`) |
+**Supported Actions:**
+| Action Type | Description | Required Fields |
+|-------------|-------------|-----------------|
+| `market_buy/sell` | Instant execution | `symbol`, `volume` |
+| `limit_buy/sell` | Pending limit order | `symbol`, `volume`, `price` |
+| `stop_buy/sell` | Pending stop order | `symbol`, `volume`, `price` |
+| `close_position` | Close active position | `ticket` |
+| `cancel_order` | Delete pending order | `ticket` |
 
-### Order Response JSON (REP → REQ)
+## Visualization Logic
 
-**Success:**
-```json
-{
-    "success": true,
-    "ticket": 123456789
-}
-```
+### 1. Time-Based Charting
+-   **X-Axis**: Represents Unix Timestamps (Seconds).
+-   **Formatting**: Converted to `HH:MM:SS` format on the chart axis.
+-   **Data Alignment**: Price candles and Tick Volume bars are aligned by exact timestamp.
 
-**Failure:**
-```json
-{
-    "success": false,
-    "error": "Not enough money"
-}
-```
+### 2. Order Visualization
+Active trades are drawn directly on the price chart:
 
-## UI Component Layout
+| Item Type | Visual Style | Color | Details |
+|-----------|--------------|-------|---------|
+| **BUY Position** | Dashed Line | 🔵 Blue | Label: `BUY #Ticket Vol` |
+| **SELL Position** | Dashed Line | 🔴 Red | Label: `SELL #Ticket Vol` |
+| **BUY Order** | Dotted Line | 🔵 Blue | Label: `BUY LIMIT/STOP #Ticket` |
+| **SELL Order** | Dotted Line | 🔴 Red | Label: `SELL LIMIT/STOP #Ticket` |
 
+### 3. UI Component Layout
 ```mermaid
 flowchart LR
     subgraph Window["MT5 Trading Chart Window"]
         subgraph SidePanel["Left Side Panel (250px)"]
             direction TB
-            AccountInfo["💰 Account Info<br/>├ Balance<br/>├ Equity<br/>├ Margin Used<br/>└ Free Margin"]
-            Prices["📈 Prices<br/>├ Bid<br/>├ Ask<br/>└ Volume"]
-            LotSize["📦 Lot Size<br/>├ Min/Max/Step<br/>├ +/- Buttons<br/>└ Quick Presets"]
-            MarketOrders["🔥 Market Orders<br/>├ BUY Button<br/>└ SELL Button"]
-            LimitOrders["📋 Limit Orders<br/>├ Price Input<br/>├ BUY LIMIT<br/>└ SELL LIMIT"]
-            StopOrders["🛑 Stop Orders<br/>├ Price Input<br/>├ BUY STOP<br/>└ SELL STOP"]
-            ActivePos["💼 Active Positions<br/>├ Symbol/Type/Vol<br/>├ Profit<br/>└ Close Button"]
-            PendingOrd["⏳ Pending Orders<br/>├ Type/Vol/Price<br/>└ Cancel Button"]
-            OrderResult["📨 Last Order Result"]
+            AccountInfo["💰 Account Info"]
+            Prices["📈 Prices"]
+            TradeControls["⚡ Order Controls<br/>(Market/Limit/Stop)"]
+            sep1[separator]
+            ActivePos["💼 Active Positions<br/>(List with 'Close' buttons)"]
+            PendingOrd["⏳ Pending Orders<br/>(List with 'Cancel' buttons)"]
+            
+            AccountInfo --> Prices
+            Prices --> TradeControls
+            TradeControls --> sep1
+            sep1 --> ActivePos
+            ActivePos --> PendingOrd
         end
         
         subgraph MainPanel["Central Panel"]
             direction TB
-            Header["Symbol + Current Prices + Tick Volume"]
-            PriceChart2["Price Chart (65% height)<br/>• Bid Line (Green)<br/>• Ask Line (Red)"]
-            VolumeChart2["Volume Chart (35% height)<br/>• Tick Volume Bars (Blue)"]
-        end
-    end
-```
-
-## File Structure
-
-```mermaid
-graph LR
-    subgraph Repository["SUM3API Repository"]
-        subgraph MQL5Dir["MQL5/"]
-            ExpertsDir["Experts/"]
-            IncludeDir["Include/"]
-            LibrariesDir["Libraries/ (required)"]
+            Header["Symbol + Prices + Tick Volume"]
+            PriceChart2["Price Chart (Time-Axis)<br/>• Bid/Ask Lines<br/>• Order Lines (Blue/Red)"]
+            VolumeChart2["Volume Chart (Time-Axis)<br/>• Tick Volume Bars"]
             
-            ExpertsDir --> ZmqPub["ZmqPublisher.mq5<br/>(v2.0 with orders)"]
-            IncludeDir --> ZmqDir["Zmq/"]
-            ZmqDir --> ZmqMqh["Zmq.mqh<br/>(Connect + Receive)"]
-            LibrariesDir --> LibZmqDll["libzmq.dll"]
+            Header --> PriceChart2
+            PriceChart2 --> VolumeChart2
         end
-        
-        subgraph Mt5ChartDir["mt5-chart/"]
-            CargoToml["Cargo.toml"]
-            SrcDir["src/"]
-            SrcDir --> MainRs["main.rs<br/>(Trading UI)"]
-        end
-        
-        ArchDiagram["trading-architecture-diagram.md"]
-        README["README.md"]
     end
 ```
-
-## ZMQ Socket Configuration
-
-| Socket | Type | Port | Direction | Purpose |
-|--------|------|------|-----------|---------|
-| Publisher | PUB | 5555 | MT5 → Rust | Tick data + Account info |
-| Responder | REP | 5556 | MT5 ← Rust | Order execution |
-
-> [!IMPORTANT]
-> The `libzmq.dll` must be placed in the `MQL5/Libraries/` folder of your MetaTrader 5 data directory.
-
-> [!WARNING]
-> Order buttons execute **REAL** trades on your MT5 account. Always test on a demo account first!
-
-## Trading Features
-
-### Account Information Display
-- **Balance**: Current account balance
-- **Equity**: Balance + floating P/L
-- **Margin Used**: Margin for open positions
-- **Free Margin**: Available margin for new trades
-
-### Order Types Supported
-1. **Market Orders**: Instant execution at current price
-2. **Limit Orders**: Pending orders at specified price (better than current)
-3. **Stop Orders**: Pending orders at specified price (worse than current)
-
-### Lot Size Management
-- Display of min/max lot and step size
-- Adjustable via +/- buttons
-- Quick preset buttons (0.01, 0.1, 0.5, 1.0)
-- Manual text input with validation

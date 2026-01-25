@@ -359,5 +359,6 @@ void OnTick()
       g_publisher.Send(json);
       // Print("Published: ", json); // Uncomment for debugging (spammy)
    }
+  }
   
 //+------------------------------------------------------------------+
