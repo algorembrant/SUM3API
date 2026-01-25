@@ -95,6 +95,15 @@ sequenceDiagram
     EA->>REP: Send response JSON
     REP->>Rust: Receive response
     Rust->>GUI: Display order result
+
+    Note over MT5,GUI: Trade Management (Cancel/Close)
+    GUI->>Rust: User clicks Close/Cancel
+    Rust->>REP: Send {"type": "close_position" | "cancel_order", "ticket": ...}
+    REP->>EA: Process Request
+    EA->>MT5: PositionClose / OrderDelete
+    MT5-->>EA: Result
+    EA->>REP: Success/Fail Response
+    REP->>Rust: Update UI (Position removed from list on next tick)
 ```
 
 ## Data Structures
@@ -114,7 +123,13 @@ sequenceDiagram
     "free_margin": 9850.00,
     "min_lot": 0.01,
     "max_lot": 100.00,
-    "lot_step": 0.01
+    "lot_step": 0.01,
+    "positions": [
+        {"ticket": 12345, "type": "BUY", "volume": 1.0, "price": 2000.50, "profit": 50.0}
+    ],
+    "orders": [
+        {"ticket": 12346, "type": "BUY LIMIT", "volume": 0.1, "price": 1990.00}
+    ]
 }
 ```
 
@@ -138,6 +153,8 @@ sequenceDiagram
 | `limit_sell` | Pending sell limit order |
 | `stop_buy` | Pending buy stop order |
 | `stop_sell` | Pending sell stop order |
+| `close_position` | Close an active position (requires `ticket`) |
+| `cancel_order` | Delete a pending order (requires `ticket`) |
 
 ### Order Response JSON (REP → REQ)
 
@@ -170,6 +187,8 @@ flowchart LR
             MarketOrders["🔥 Market Orders<br/>├ BUY Button<br/>└ SELL Button"]
             LimitOrders["📋 Limit Orders<br/>├ Price Input<br/>├ BUY LIMIT<br/>└ SELL LIMIT"]
             StopOrders["🛑 Stop Orders<br/>├ Price Input<br/>├ BUY STOP<br/>└ SELL STOP"]
+            ActivePos["💼 Active Positions<br/>├ Symbol/Type/Vol<br/>├ Profit<br/>└ Close Button"]
+            PendingOrd["⏳ Pending Orders<br/>├ Type/Vol/Price<br/>└ Cancel Button"]
             OrderResult["📨 Last Order Result"]
         end
         

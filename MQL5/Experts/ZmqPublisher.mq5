@@ -81,59 +81,80 @@ void OnDeinit(const int reason)
 //+------------------------------------------------------------------+
 //| Process incoming order request                                   |
 //+------------------------------------------------------------------+
+//+------------------------------------------------------------------+
+//| Process incoming order request                                   |
+//+------------------------------------------------------------------+
 string ProcessOrderRequest(string request)
   {
    // Expected JSON format:
-   // {"type":"market_buy"|"market_sell"|"limit_buy"|"limit_sell"|"stop_buy"|"stop_sell",
-   //  "symbol":"XAUUSD", "volume":0.01, "price":2000.0}
+   // {"type":"market_buy"|"close_position"|"cancel_order"|..., 
+   //  "symbol":"XAUUSD", "volume":0.01, "price":2000.0, "ticket":12345}
    
-   // Simple JSON parsing (avoiding complex libraries)
    string orderType = ExtractJsonString(request, "type");
    string symbol = ExtractJsonString(request, "symbol");
    double volume = ExtractJsonDouble(request, "volume");
    double price = ExtractJsonDouble(request, "price");
+   ulong ticket = (ulong)ExtractJsonDouble(request, "ticket"); // Simple extraction
    
    if(symbol == "") symbol = _Symbol;
    if(volume <= 0) volume = 0.01;
    
-   Print("Order request: type=", orderType, " symbol=", symbol, " vol=", volume, " price=", price);
+   Print("Order request: type=", orderType, " symbol=", symbol, " vol=", volume, " price=", price, " ticket=", ticket);
    
    bool success = false;
-   ulong ticket = 0;
+   ulong resultTicket = 0;
    string errorMsg = "";
    
    // Execute order based on type
    if(orderType == "market_buy") {
       double askPrice = SymbolInfoDouble(symbol, SYMBOL_ASK);
       success = g_trade.Buy(volume, symbol, askPrice, 0, 0, "Rust GUI Order");
-      if(success) ticket = g_trade.ResultOrder();
+      if(success) resultTicket = g_trade.ResultOrder();
       else errorMsg = GetLastErrorDescription();
    }
    else if(orderType == "market_sell") {
       double bidPrice = SymbolInfoDouble(symbol, SYMBOL_BID);
       success = g_trade.Sell(volume, symbol, bidPrice, 0, 0, "Rust GUI Order");
-      if(success) ticket = g_trade.ResultOrder();
+      if(success) resultTicket = g_trade.ResultOrder();
       else errorMsg = GetLastErrorDescription();
    }
    else if(orderType == "limit_buy") {
       success = g_trade.BuyLimit(volume, price, symbol, 0, 0, ORDER_TIME_GTC, 0, "Rust GUI Limit");
-      if(success) ticket = g_trade.ResultOrder();
+      if(success) resultTicket = g_trade.ResultOrder();
       else errorMsg = GetLastErrorDescription();
    }
    else if(orderType == "limit_sell") {
       success = g_trade.SellLimit(volume, price, symbol, 0, 0, ORDER_TIME_GTC, 0, "Rust GUI Limit");
-      if(success) ticket = g_trade.ResultOrder();
+      if(success) resultTicket = g_trade.ResultOrder();
       else errorMsg = GetLastErrorDescription();
    }
    else if(orderType == "stop_buy") {
       success = g_trade.BuyStop(volume, price, symbol, 0, 0, ORDER_TIME_GTC, 0, "Rust GUI Stop");
-      if(success) ticket = g_trade.ResultOrder();
+      if(success) resultTicket = g_trade.ResultOrder();
       else errorMsg = GetLastErrorDescription();
    }
    else if(orderType == "stop_sell") {
       success = g_trade.SellStop(volume, price, symbol, 0, 0, ORDER_TIME_GTC, 0, "Rust GUI Stop");
-      if(success) ticket = g_trade.ResultOrder();
+      if(success) resultTicket = g_trade.ResultOrder();
       else errorMsg = GetLastErrorDescription();
+   }
+   else if(orderType == "close_position") {
+      if(ticket > 0) {
+         success = g_trade.PositionClose(ticket);
+         if(success) errorMsg = "Position closed";
+         else errorMsg = GetLastErrorDescription();
+      } else {
+         errorMsg = "Invalid ticket for close_position";
+      }
+   }
+   else if(orderType == "cancel_order") {
+      if(ticket > 0) {
+         success = g_trade.OrderDelete(ticket);
+         if(success) errorMsg = "Order deleted";
+         else errorMsg = GetLastErrorDescription();
+      } else {
+         errorMsg = "Invalid ticket for cancel_order";
+      }
    }
    else {
       errorMsg = "Unknown order type: " + orderType;
@@ -142,7 +163,7 @@ string ProcessOrderRequest(string request)
    // Build response JSON
    string response;
    if(success) {
-      StringConcatenate(response, "{\"success\":true,\"ticket\":", IntegerToString(ticket), "}");
+      StringConcatenate(response, "{\"success\":true,\"ticket\":", IntegerToString(resultTicket), "}");
    } else {
       StringConcatenate(response, "{\"success\":false,\"error\":\"", errorMsg, "\"}");
    }
@@ -266,7 +287,58 @@ void OnTick()
       double maxLot = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MAX);
       double lotStep = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_STEP);
       
-      // Create JSON with tick data + account info
+      // Get Active Positions (Only for current symbol to simplify)
+      string positionsJson = "[";
+      int posCount = PositionsTotal();
+      bool firstPos = true;
+      for(int i = 0; i < posCount; i++) {
+         ulong ticket = PositionGetTicket(i);
+         if(PositionSelectByTicket(ticket)) {
+            if(PositionGetString(POSITION_SYMBOL) == _Symbol) {
+               if(!firstPos) StringAdd(positionsJson, ",");
+               
+               string posType = (PositionGetInteger(POSITION_TYPE) == POSITION_TYPE_BUY) ? "BUY" : "SELL";
+               StringAdd(positionsJson, "{\"ticket\":" + IntegerToString(ticket) + 
+                         ",\"type\":\"" + posType + "\"" +
+                         ",\"volume\":" + DoubleToString(PositionGetDouble(POSITION_VOLUME), 2) +
+                         ",\"price\":" + DoubleToString(PositionGetDouble(POSITION_PRICE_OPEN), _Digits) +
+                         ",\"profit\":" + DoubleToString(PositionGetDouble(POSITION_PROFIT), 2) + 
+                         "}");
+               firstPos = false;
+            }
+         }
+      }
+      StringAdd(positionsJson, "]");
+      
+      // Get Pending Orders (Only for current symbol)
+      string ordersJson = "[";
+      int orderCount = OrdersTotal();
+      bool firstOrder = true;
+      for(int i = 0; i < orderCount; i++) {
+         ulong ticket = OrderGetTicket(i);
+         if(OrderSelect(ticket)) {
+            if(OrderGetString(ORDER_SYMBOL) == _Symbol) {
+               if(!firstOrder) StringAdd(ordersJson, ",");
+               
+               ENUM_ORDER_TYPE type = (ENUM_ORDER_TYPE)OrderGetInteger(ORDER_TYPE);
+               string orderTypeStr = "UNKNOWN";
+               if(type == ORDER_TYPE_BUY_LIMIT) orderTypeStr = "BUY LIMIT";
+               else if(type == ORDER_TYPE_SELL_LIMIT) orderTypeStr = "SELL LIMIT";
+               else if(type == ORDER_TYPE_BUY_STOP) orderTypeStr = "BUY STOP";
+               else if(type == ORDER_TYPE_SELL_STOP) orderTypeStr = "SELL STOP";
+               
+               StringAdd(ordersJson, "{\"ticket\":" + IntegerToString(ticket) + 
+                         ",\"type\":\"" + orderTypeStr + "\"" +
+                         ",\"volume\":" + DoubleToString(OrderGetDouble(ORDER_VOLUME_INITIAL), 2) +
+                         ",\"price\":" + DoubleToString(OrderGetDouble(ORDER_PRICE_OPEN), _Digits) +
+                         "}");
+               firstOrder = false;
+            }
+         }
+      }
+      StringAdd(ordersJson, "]");
+      
+      // Create JSON with tick data + account info + positions + orders
       string json;
       StringConcatenate(json, "{\"symbol\":\"", _Symbol, 
                         "\",\"bid\":", DoubleToString(tick.bid, _Digits),
@@ -280,10 +352,12 @@ void OnTick()
                         ",\"min_lot\":", DoubleToString(minLot, 2),
                         ",\"max_lot\":", DoubleToString(maxLot, 2),
                         ",\"lot_step\":", DoubleToString(lotStep, 2),
+                        ",\"positions\":", positionsJson,
+                        ",\"orders\":", ordersJson,
                         "}");
                         
       g_publisher.Send(json);
       // Print("Published: ", json); // Uncomment for debugging (spammy)
    }
-  }
+  
 //+------------------------------------------------------------------+

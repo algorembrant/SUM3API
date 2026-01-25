@@ -9,6 +9,25 @@ use zeromq::{Socket, SocketRecv, SocketSend};
 // ============================================================================
 
 #[derive(Clone, Debug, Deserialize)]
+struct PositionData {
+    ticket: u64,
+    #[serde(rename = "type")]
+    pos_type: String, // "BUY" or "SELL"
+    volume: f64,
+    price: f64,
+    profit: f64,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct PendingOrderData {
+    ticket: u64,
+    #[serde(rename = "type")]
+    order_type: String, // "BUY LIMIT", "SELL STOP", etc.
+    volume: f64,
+    price: f64,
+}
+
+#[derive(Clone, Debug, Deserialize)]
 struct TickData {
     symbol: String,
     bid: f64,
@@ -32,6 +51,12 @@ struct TickData {
     max_lot: f64,
     #[serde(default)]
     lot_step: f64,
+    
+    // Active trades
+    #[serde(default)]
+    positions: Vec<PositionData>,
+    #[serde(default)]
+    orders: Vec<PendingOrderData>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -41,6 +66,8 @@ struct OrderRequest {
     symbol: String,
     volume: f64,
     price: f64,
+    #[serde(default)]
+    ticket: u64, // For close/cancel
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -81,7 +108,11 @@ struct Mt5ChartApp {
     last_order_result: Option<String>,
     
     // Volume display
-    volume_history: Vec<u64>,
+    volume_history: Vec<(i64, u64)>, // (time, volume)
+    
+    // Live Trade Data
+    positions: Vec<PositionData>,
+    pending_orders: Vec<PendingOrderData>,
 }
 
 impl Mt5ChartApp {
@@ -107,19 +138,24 @@ impl Mt5ChartApp {
             lot_size_str: "0.01".to_string(),
             limit_price: "0.0".to_string(),
             stop_price: "0.0".to_string(),
+            stop_price: "0.0".to_string(),
             last_order_result: None,
             volume_history: Vec::new(),
+            positions: Vec::new(),
+            pending_orders: Vec::new(),
         }
     }
     
-    fn send_order(&mut self, order_type: &str, price: Option<f64>) {
+    fn send_order(&mut self, order_type: &str, price: Option<f64>, ticket: Option<u64>) {
         let price_val = price.unwrap_or(0.0);
+        let ticket_val = ticket.unwrap_or(0);
         
         let request = OrderRequest {
             order_type: order_type.to_string(),
             symbol: self.symbol.clone(),
             volume: self.lot_size,
             price: price_val,
+            ticket: ticket_val,
         };
         
         // Non-blocking send
@@ -144,7 +180,7 @@ impl eframe::App for Mt5ChartApp {
         // Receive all available tick data from the channel without blocking
         while let Ok(tick) = self.tick_receiver.try_recv() {
             self.symbol = tick.symbol.clone();
-            self.volume_history.push(tick.volume);
+            self.volume_history.push((tick.time, tick.volume));
             
             // Update account info from latest tick
             if tick.balance > 0.0 {
@@ -158,6 +194,10 @@ impl eframe::App for Mt5ChartApp {
                     self.lot_step = tick.lot_step;
                 }
             }
+            
+            // Update active trades
+            self.positions = tick.positions.clone();
+            self.pending_orders = tick.orders.clone();
             
             self.data.push(tick);
             // Keep only last 1000 points to avoid memory issues
@@ -307,14 +347,14 @@ impl eframe::App for Mt5ChartApp {
                         egui::RichText::new("BUY").color(egui::Color32::WHITE).strong()
                     ).fill(egui::Color32::from_rgb(50, 150, 50));
                     if ui.add(buy_btn).clicked() {
-                        self.send_order("market_buy", None);
+                        self.send_order("market_buy", None, None);
                     }
                     
                     let sell_btn = egui::Button::new(
                         egui::RichText::new("SELL").color(egui::Color32::WHITE).strong()
                     ).fill(egui::Color32::from_rgb(180, 50, 50));
                     if ui.add(sell_btn).clicked() {
-                        self.send_order("market_sell", None);
+                        self.send_order("market_sell", None, None);
                     }
                 });
                 
@@ -335,14 +375,14 @@ impl eframe::App for Mt5ChartApp {
                         egui::RichText::new("BUY LIMIT").color(egui::Color32::WHITE)
                     ).fill(egui::Color32::from_rgb(50, 120, 50));
                     if ui.add(buy_btn).clicked() {
-                        self.send_order("limit_buy", Some(price));
+                        self.send_order("limit_buy", Some(price), None);
                     }
                     
                     let sell_btn = egui::Button::new(
                         egui::RichText::new("SELL LIMIT").color(egui::Color32::WHITE)
                     ).fill(egui::Color32::from_rgb(150, 50, 50));
                     if ui.add(sell_btn).clicked() {
-                        self.send_order("limit_sell", Some(price));
+                        self.send_order("limit_sell", Some(price), None);
                     }
                 });
                 
@@ -363,20 +403,83 @@ impl eframe::App for Mt5ChartApp {
                         egui::RichText::new("BUY STOP").color(egui::Color32::WHITE)
                     ).fill(egui::Color32::from_rgb(50, 100, 150));
                     if ui.add(buy_btn).clicked() {
-                        self.send_order("stop_buy", Some(price));
+                        self.send_order("stop_buy", Some(price), None);
                     }
                     
                     let sell_btn = egui::Button::new(
                         egui::RichText::new("SELL STOP").color(egui::Color32::WHITE)
                     ).fill(egui::Color32::from_rgb(150, 100, 50));
                     if ui.add(sell_btn).clicked() {
-                        self.send_order("stop_sell", Some(price));
+                        self.send_order("stop_sell", Some(price), None);
                     }
                 });
                 
                 ui.add_space(10.0);
                 ui.separator();
                 
+                ui.add_space(10.0);
+                ui.separator();
+                
+                // ============================================================
+                // Active Positions Management
+                // ============================================================
+                if !self.positions.is_empty() {
+                    ui.heading("💼 Active Positions");
+                    egui::ScrollArea::vertical().id_source("positions_scroll").max_height(150.0).show(ui, |ui| {
+                        for pos in &self.positions {
+                            ui.group(|ui| {
+                                ui.horizontal(|ui| {
+                                    let color = if pos.pos_type == "BUY" {
+                                        egui::Color32::from_rgb(100, 200, 100)
+                                    } else {
+                                        egui::Color32::from_rgb(200, 100, 100)
+                                    };
+                                    ui.colored_label(color, &pos.pos_type);
+                                    ui.label(format!("{:.2} lots @ {:.5}", pos.volume, pos.price));
+                                });
+                                ui.horizontal(|ui| {
+                                    let profit_color = if pos.profit >= 0.0 {
+                                        egui::Color32::from_rgb(100, 200, 100)
+                                    } else {
+                                        egui::Color32::from_rgb(200, 100, 100)
+                                    };
+                                    ui.colored_label(profit_color, format!("${:.2}", pos.profit));
+                                    
+                                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                        if ui.small_button("❌ Close").clicked() {
+                                            self.send_order("close_position", None, Some(pos.ticket));
+                                        }
+                                    });
+                                });
+                            });
+                        }
+                    });
+                    ui.separator();
+                }
+
+                // ============================================================
+                // Pending Orders Management
+                // ============================================================
+                if !self.pending_orders.is_empty() {
+                    ui.heading("⏳ Pending Orders");
+                    egui::ScrollArea::vertical().id_source("orders_scroll").max_height(100.0).show(ui, |ui| {
+                        for order in &self.pending_orders {
+                            ui.group(|ui| {
+                                ui.horizontal(|ui| {
+                                    ui.label(&order.order_type);
+                                    ui.label(format!("{:.2} lots @ {:.5}", order.volume, order.price));
+                                });
+                                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                    if ui.small_button("❌ Cancel").clicked() {
+                                        self.send_order("cancel_order", None, Some(order.ticket));
+                                    }
+                                });
+                            });
+                        }
+                    });
+                    ui.separator();
+                }
+
                 // Order result feedback
                 if let Some(ref result) = self.last_order_result {
                     ui.heading("📨 Last Order");
@@ -412,26 +515,76 @@ impl eframe::App for Mt5ChartApp {
             
             ui.separator();
 
-            // Price chart - maintains microsecond bid/ask line formation
+            // Price chart
             let price_plot = Plot::new("mt5_price_plot")
                 .height(ui.available_height() * 0.65)
-                .legend(egui_plot::Legend::default());
+                .legend(egui_plot::Legend::default())
+                .x_axis_formatter(|x, _range| {
+                    let timestamp = x as i64;
+                    // Simple HH:MM:SS formatter
+                    let seconds = timestamp % 60;
+                    let minutes = (timestamp / 60) % 60;
+                    let hours = (timestamp / 3600) % 24;
+                    format!("{:02}:{:02}:{:02}", hours, minutes, seconds)
+                });
 
             price_plot.show(ui, |plot_ui| {
                 let bid_points: PlotPoints = self.data
                     .iter()
-                    .enumerate()
-                    .map(|(i, t)| [i as f64, t.bid])
+                    .map(|t| [t.time as f64, t.bid])
                     .collect();
                 
                 let ask_points: PlotPoints = self.data
                     .iter()
-                    .enumerate()
-                    .map(|(i, t)| [i as f64, t.ask])
+                    .map(|t| [t.time as f64, t.ask])
                     .collect();
 
                 plot_ui.line(Line::new(bid_points).name("Bid").color(egui::Color32::from_rgb(100, 200, 100)));
                 plot_ui.line(Line::new(ask_points).name("Ask").color(egui::Color32::from_rgb(200, 100, 100)));
+                
+                // Draw Active Positions
+                for pos in &self.positions {
+                    let color = if pos.pos_type == "BUY" {
+                        egui::Color32::from_rgb(50, 100, 255) // Blue
+                    } else {
+                        egui::Color32::from_rgb(255, 50, 50) // Red
+                    };
+                    
+                    plot_ui.hline(
+                        egui_plot::HLine::new(pos.price)
+                            .color(color)
+                            .name(format!("{} #{}", pos.pos_type, pos.ticket))
+                            .style(egui_plot::LineStyle::Dashed)
+                    );
+                    
+                    // Note: Actual buttons need to be outside the plot or using sophisticated Overlay
+                    // For now, listing them in a separate panel or relying on the plot legend/tooltip is easier,
+                    // but the user asked for labels ON the chart. egui_plot doesn't easily support interactive buttons inside.
+                    // We will implement a list below the chart or overlay text.
+                    plot_ui.text(egui_plot::Text::new(
+                        egui_plot::PlotPoint::new(
+                            self.data.last().map(|t| t.time as f64).unwrap_or(0.0), 
+                            pos.price
+                        ),
+                        format!("{} {:.2}", pos.pos_type, pos.volume)
+                    ).color(color));
+                }
+                
+                // Draw Pending Orders
+                for order in &self.pending_orders {
+                    let color = if order.order_type.contains("BUY") {
+                         egui::Color32::from_rgb(50, 100, 255) // Blue
+                    } else {
+                         egui::Color32::from_rgb(255, 50, 50) // Red
+                    };
+                    
+                    plot_ui.hline(
+                        egui_plot::HLine::new(order.price)
+                            .color(color)
+                            .name(format!("{} #{}", order.order_type, order.ticket))
+                            .style(egui_plot::LineStyle::Dotted)
+                    );
+                }
             });
             
             ui.add_space(5.0);
@@ -441,13 +594,19 @@ impl eframe::App for Mt5ChartApp {
             let volume_plot = Plot::new("mt5_volume_plot")
                 .height(ui.available_height())
                 .legend(egui_plot::Legend::default())
-                .show_axes([true, true]);
+                .show_axes([true, true])
+                .x_axis_formatter(|x, _range| {
+                    let timestamp = x as i64;
+                    let seconds = timestamp % 60;
+                    let minutes = (timestamp / 60) % 60;
+                    let hours = (timestamp / 3600) % 24;
+                    format!("{:02}:{:02}:{:02}", hours, minutes, seconds)
+                });
 
             volume_plot.show(ui, |plot_ui| {
                 let bars: Vec<Bar> = self.volume_history
                     .iter()
-                    .enumerate()
-                    .map(|(i, v)| Bar::new(i as f64, *v as f64).width(0.8))
+                    .map(|(t, v)| Bar::new(*t as f64, *v as f64).width(0.8))  // Note: Width might need adjustment for time scale
                     .collect();
                 
                 plot_ui.bar_chart(
