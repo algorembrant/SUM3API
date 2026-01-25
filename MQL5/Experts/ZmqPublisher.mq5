@@ -5,36 +5,58 @@
 //+------------------------------------------------------------------+
 #property copyright "Antigravity"
 #property link      ""
-#property version   "1.00"
+#property version   "2.00"
 
 // Include our ZMQ wrapper
 #include <Zmq/Zmq.mqh>
 
-// Input parameters
-input string InpBindAddress = "tcp://0.0.0.0:5555"; // Bind Address
+// Include trading functions
+#include <Trade/Trade.mqh>
 
-CZmq *g_publisher;
+// Input parameters
+input string InpPubAddress = "tcp://0.0.0.0:5555"; // Tick Publisher Address
+input string InpRepAddress = "tcp://0.0.0.0:5556"; // Order Handler Address
+input double InpDefaultSlippage = 10;              // Default Slippage (points)
+
+CZmq *g_publisher;  // PUB socket for tick data
+CZmq *g_responder;  // REP socket for order handling
+CTrade g_trade;     // Trading helper
 
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
 //+------------------------------------------------------------------+
 int OnInit()
   {
-   Print("Initializing ZmqPublisher...");
+   Print("Initializing ZmqPublisher v2.0 with Order Support...");
    
+   // Initialize tick publisher (PUB socket)
    g_publisher = new CZmq();
-   
    if(!g_publisher.Init(ZMQ_PUB)) {
       Print("Failed to initialize ZMQ Publisher");
       return(INIT_FAILED);
    }
-   
-   if(!g_publisher.Bind(InpBindAddress)) {
-      Print("Failed to bind to ", InpBindAddress);
+   if(!g_publisher.Bind(InpPubAddress)) {
+      Print("Failed to bind publisher to ", InpPubAddress);
       return(INIT_FAILED);
    }
+   Print("Tick Publisher bound to ", InpPubAddress);
    
-   Print("ZmqPublisher bound to ", InpBindAddress);
+   // Initialize order responder (REP socket)
+   g_responder = new CZmq();
+   if(!g_responder.Init(ZMQ_REP)) {
+      Print("Failed to initialize ZMQ Responder");
+      return(INIT_FAILED);
+   }
+   if(!g_responder.Bind(InpRepAddress)) {
+      Print("Failed to bind responder to ", InpRepAddress);
+      return(INIT_FAILED);
+   }
+   Print("Order Responder bound to ", InpRepAddress);
+   
+   // Configure trade settings
+   g_trade.SetDeviationInPoints((ulong)InpDefaultSlippage);
+   g_trade.SetTypeFilling(ORDER_FILLING_IOC);
+   
    return(INIT_SUCCEEDED);
   }
 
@@ -49,6 +71,167 @@ void OnDeinit(const int reason)
       delete g_publisher;
       g_publisher = NULL;
    }
+   if(g_responder != NULL) {
+      g_responder.Shutdown();
+      delete g_responder;
+      g_responder = NULL;
+   }
+  }
+
+//+------------------------------------------------------------------+
+//| Process incoming order request                                   |
+//+------------------------------------------------------------------+
+string ProcessOrderRequest(string request)
+  {
+   // Expected JSON format:
+   // {"type":"market_buy"|"market_sell"|"limit_buy"|"limit_sell"|"stop_buy"|"stop_sell",
+   //  "symbol":"XAUUSD", "volume":0.01, "price":2000.0}
+   
+   // Simple JSON parsing (avoiding complex libraries)
+   string orderType = ExtractJsonString(request, "type");
+   string symbol = ExtractJsonString(request, "symbol");
+   double volume = ExtractJsonDouble(request, "volume");
+   double price = ExtractJsonDouble(request, "price");
+   
+   if(symbol == "") symbol = _Symbol;
+   if(volume <= 0) volume = 0.01;
+   
+   Print("Order request: type=", orderType, " symbol=", symbol, " vol=", volume, " price=", price);
+   
+   bool success = false;
+   ulong ticket = 0;
+   string errorMsg = "";
+   
+   // Execute order based on type
+   if(orderType == "market_buy") {
+      double askPrice = SymbolInfoDouble(symbol, SYMBOL_ASK);
+      success = g_trade.Buy(volume, symbol, askPrice, 0, 0, "Rust GUI Order");
+      if(success) ticket = g_trade.ResultOrder();
+      else errorMsg = GetLastErrorDescription();
+   }
+   else if(orderType == "market_sell") {
+      double bidPrice = SymbolInfoDouble(symbol, SYMBOL_BID);
+      success = g_trade.Sell(volume, symbol, bidPrice, 0, 0, "Rust GUI Order");
+      if(success) ticket = g_trade.ResultOrder();
+      else errorMsg = GetLastErrorDescription();
+   }
+   else if(orderType == "limit_buy") {
+      success = g_trade.BuyLimit(volume, price, symbol, 0, 0, ORDER_TIME_GTC, 0, "Rust GUI Limit");
+      if(success) ticket = g_trade.ResultOrder();
+      else errorMsg = GetLastErrorDescription();
+   }
+   else if(orderType == "limit_sell") {
+      success = g_trade.SellLimit(volume, price, symbol, 0, 0, ORDER_TIME_GTC, 0, "Rust GUI Limit");
+      if(success) ticket = g_trade.ResultOrder();
+      else errorMsg = GetLastErrorDescription();
+   }
+   else if(orderType == "stop_buy") {
+      success = g_trade.BuyStop(volume, price, symbol, 0, 0, ORDER_TIME_GTC, 0, "Rust GUI Stop");
+      if(success) ticket = g_trade.ResultOrder();
+      else errorMsg = GetLastErrorDescription();
+   }
+   else if(orderType == "stop_sell") {
+      success = g_trade.SellStop(volume, price, symbol, 0, 0, ORDER_TIME_GTC, 0, "Rust GUI Stop");
+      if(success) ticket = g_trade.ResultOrder();
+      else errorMsg = GetLastErrorDescription();
+   }
+   else {
+      errorMsg = "Unknown order type: " + orderType;
+   }
+   
+   // Build response JSON
+   string response;
+   if(success) {
+      StringConcatenate(response, "{\"success\":true,\"ticket\":", IntegerToString(ticket), "}");
+   } else {
+      StringConcatenate(response, "{\"success\":false,\"error\":\"", errorMsg, "\"}");
+   }
+   
+   return response;
+  }
+
+//+------------------------------------------------------------------+
+//| Extract string value from JSON                                   |
+//+------------------------------------------------------------------+
+string ExtractJsonString(string json, string key)
+  {
+   string searchKey = "\"" + key + "\":\"";
+   int startPos = StringFind(json, searchKey);
+   if(startPos < 0) return "";
+   
+   startPos += StringLen(searchKey);
+   int endPos = StringFind(json, "\"", startPos);
+   if(endPos < 0) return "";
+   
+   return StringSubstr(json, startPos, endPos - startPos);
+  }
+
+//+------------------------------------------------------------------+
+//| Extract double value from JSON                                   |
+//+------------------------------------------------------------------+
+double ExtractJsonDouble(string json, string key)
+  {
+   string searchKey = "\"" + key + "\":";
+   int startPos = StringFind(json, searchKey);
+   if(startPos < 0) return 0.0;
+   
+   startPos += StringLen(searchKey);
+   
+   // Find end of number (comma, }, or end of string)
+   int endPos = startPos;
+   int len = StringLen(json);
+   while(endPos < len) {
+      ushort ch = StringGetCharacter(json, endPos);
+      if(ch == ',' || ch == '}' || ch == ' ') break;
+      endPos++;
+   }
+   
+   string valueStr = StringSubstr(json, startPos, endPos - startPos);
+   return StringToDouble(valueStr);
+  }
+
+//+------------------------------------------------------------------+
+//| Get human-readable error description                             |
+//+------------------------------------------------------------------+
+string GetLastErrorDescription()
+  {
+   int err = GetLastError();
+   return "Error " + IntegerToString(err) + ": " + ErrorDescription(err);
+  }
+
+//+------------------------------------------------------------------+
+//| Error description helper                                         |
+//+------------------------------------------------------------------+
+string ErrorDescription(int error)
+  {
+   switch(error) {
+      case 0: return "No error";
+      case 10004: return "Requote";
+      case 10006: return "Request rejected";
+      case 10007: return "Request canceled by trader";
+      case 10010: return "Request rejected - only part of the request was fulfilled";
+      case 10011: return "Request error";
+      case 10012: return "Request canceled due to timeout";
+      case 10013: return "Invalid request";
+      case 10014: return "Invalid volume";
+      case 10015: return "Invalid price";
+      case 10016: return "Invalid stops";
+      case 10017: return "Trade disabled";
+      case 10018: return "Market is closed";
+      case 10019: return "Not enough money";
+      case 10020: return "Prices changed";
+      case 10021: return "No quotes to process request";
+      case 10022: return "Invalid order expiration date";
+      case 10023: return "Order state changed";
+      case 10024: return "Too many requests";
+      case 10025: return "No changes in request";
+      case 10026: return "Autotrading disabled by server";
+      case 10027: return "Autotrading disabled by client terminal";
+      case 10028: return "Request locked for processing";
+      case 10029: return "Long positions only allowed";
+      case 10030: return "Maximum position volume exceeded";
+      default: return "Unknown error";
+   }
   }
 
 //+------------------------------------------------------------------+
@@ -56,18 +239,47 @@ void OnDeinit(const int reason)
 //+------------------------------------------------------------------+
 void OnTick()
   {
+   // Handle order requests (non-blocking)
+   if(g_responder != NULL) {
+      string request = g_responder.Receive(true);
+      if(request != "") {
+         Print("Received order request: ", request);
+         string response = ProcessOrderRequest(request);
+         g_responder.Send(response, false);  // Blocking send for REP pattern
+         Print("Sent response: ", response);
+      }
+   }
+   
+   // Publish tick data with account info
    if(g_publisher == NULL) return;
    
    MqlTick tick;
    if(SymbolInfoTick(_Symbol, tick)) {
-      // Create JSON string manually to avoid complex dependencies
-      // Format: {"symbol": "XAUUSD", "bid": 2000.5, "ask": 2000.8, "time": 123456789}
+      // Get account info
+      double balance = AccountInfoDouble(ACCOUNT_BALANCE);
+      double equity = AccountInfoDouble(ACCOUNT_EQUITY);
+      double margin = AccountInfoDouble(ACCOUNT_MARGIN);
+      double freeMargin = AccountInfoDouble(ACCOUNT_MARGIN_FREE);
       
+      // Get symbol trading constraints
+      double minLot = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MIN);
+      double maxLot = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MAX);
+      double lotStep = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_STEP);
+      
+      // Create JSON with tick data + account info
       string json;
       StringConcatenate(json, "{\"symbol\":\"", _Symbol, 
                         "\",\"bid\":", DoubleToString(tick.bid, _Digits),
                         ",\"ask\":", DoubleToString(tick.ask, _Digits),
                         ",\"time\":", IntegerToString(tick.time),
+                        ",\"volume\":", IntegerToString(tick.volume),
+                        ",\"balance\":", DoubleToString(balance, 2),
+                        ",\"equity\":", DoubleToString(equity, 2),
+                        ",\"margin\":", DoubleToString(margin, 2),
+                        ",\"free_margin\":", DoubleToString(freeMargin, 2),
+                        ",\"min_lot\":", DoubleToString(minLot, 2),
+                        ",\"max_lot\":", DoubleToString(maxLot, 2),
+                        ",\"lot_step\":", DoubleToString(lotStep, 2),
                         "}");
                         
       g_publisher.Send(json);

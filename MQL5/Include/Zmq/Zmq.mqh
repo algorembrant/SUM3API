@@ -80,6 +80,20 @@ public:
       return true;
    }
 
+   bool Connect(string endpoint) {
+      if(!m_initialized) return false;
+      
+      uchar data[];
+      StringToCharArray(endpoint, data, 0, WHOLE_ARRAY, CP_UTF8);
+      
+      int rc = zmq_connect(m_socket, data);
+      if(rc != 0) {
+         Print("ZMQ Connect failed. Error: ", zmq_errno());
+         return false;
+      }
+      return true;
+   }
+
    int Send(string message, bool nonBlocking = true) {
       if(!m_initialized) return -1;
       
@@ -96,6 +110,23 @@ public:
       
       int bytesSent = zmq_send(m_socket, data, len, flags);
       return bytesSent;
+   }
+
+   // Non-blocking receive - returns empty string if no message available
+   string Receive(bool nonBlocking = true) {
+      if(!m_initialized) return "";
+      
+      uchar buffer[4096];
+      ArrayInitialize(buffer, 0);
+      
+      int flags = 0;
+      if(nonBlocking) flags = ZMQ_NOBLOCK;
+      
+      int bytesReceived = zmq_recv(m_socket, buffer, ArraySize(buffer) - 1, flags);
+      
+      if(bytesReceived <= 0) return "";
+      
+      return CharArrayToString(buffer, 0, bytesReceived, CP_UTF8);
    }
 
    void Shutdown() {
