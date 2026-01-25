@@ -595,6 +595,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     eframe::run_native(
         "Rust + ZMQ + MT5 Trading Chart",
         options,
-        Box::new(|_cc| Ok(Box::new(Mt5ChartApp::new(tick_rx, order_tx, response_rx)))),
+        Box::new(|_cc| Box::new(Mt5ChartApp::new(tick_rx, order_tx, response_rx))),
     ).map_err(|e| e.into())
 }
