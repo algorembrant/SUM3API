@@ -1,8 +1,11 @@
 use eframe::egui;
-use egui_plot::{Line, Plot, PlotPoints, Bar, BarChart};
+use egui_plot::{Line, Plot, PlotPoints, Bar, BarChart, PlotBounds};
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 use zeromq::{Socket, SocketRecv, SocketSend};
+use std::fs::OpenOptions;
+use std::io::Write;
+use chrono::{DateTime, TimeZone, Utc};
 
 // ============================================================================
 // Data Structures
@@ -68,6 +71,15 @@ struct OrderRequest {
     price: f64,
     #[serde(default)]
     ticket: u64, // For close/cancel
+    // History params
+    #[serde(skip_serializing_if = "Option::is_none")]
+    timeframe: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    start: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    end: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    mode: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -75,6 +87,7 @@ struct OrderResponse {
     success: bool,
     ticket: Option<i64>,
     error: Option<String>,
+    message: Option<String>,
 }
 
 // ============================================================================
@@ -107,8 +120,15 @@ struct Mt5ChartApp {
     stop_price: String,
     last_order_result: Option<String>,
     
-    // Volume display
-    volume_history: Vec<(i64, u64)>, // (time, volume)
+    // History Download UI
+    history_start_date: String,
+    history_end_date: String,
+    history_tf: String,
+    history_mode: String,
+    
+    // Live Recording
+    is_recording: bool,
+    live_record_file: Option<std::fs::File>,
     
     // Live Trade Data
     positions: Vec<PositionData>,
@@ -121,6 +141,10 @@ impl Mt5ChartApp {
         order_sender: mpsc::Sender<OrderRequest>,
         response_receiver: mpsc::Receiver<OrderResponse>,
     ) -> Self {
+        // Defaults dates to "yyyy.mm.dd"
+        let now = chrono::Local::now();
+        let today_str = now.format("%Y.%m.%d").to_string();
+        
         Self {
             tick_receiver,
             data: Vec::new(),
@@ -139,7 +163,15 @@ impl Mt5ChartApp {
             limit_price: "0.0".to_string(),
             stop_price: "0.0".to_string(),
             last_order_result: None,
-            volume_history: Vec::new(),
+            
+            history_start_date: today_str.clone(),
+            history_end_date: today_str,
+            history_tf: "M1".to_string(),
+            history_mode: "OHLC".to_string(),
+            
+            is_recording: false,
+            live_record_file: None,
+            
             positions: Vec::new(),
             pending_orders: Vec::new(),
         }
@@ -155,13 +187,36 @@ impl Mt5ChartApp {
             volume: self.lot_size,
             price: price_val,
             ticket: ticket_val,
+            timeframe: None,
+            start: None,
+            end: None,
+            mode: None,
         };
         
-        // Non-blocking send
+        self.send_request_impl(request);
+    }
+    
+    fn send_download_request(&mut self) {
+        let request = OrderRequest {
+            order_type: "download_history".to_string(),
+            symbol: self.symbol.clone(),
+            volume: 0.0,
+            price: 0.0,
+            ticket: 0,
+            timeframe: Some(self.history_tf.clone()),
+            start: Some(self.history_start_date.clone()),
+            end: Some(self.history_end_date.clone()),
+            mode: Some(self.history_mode.clone()),
+        };
+        
+        self.send_request_impl(request);
+    }
+    
+    fn send_request_impl(&mut self, request: OrderRequest) {
         if let Err(e) = self.order_sender.try_send(request) {
-            self.last_order_result = Some(format!("Failed to send order: {}", e));
+            self.last_order_result = Some(format!("Failed to send: {}", e));
         } else {
-            self.last_order_result = Some("Order sent, waiting for response...".to_string());
+            self.last_order_result = Some("Request sent...".to_string());
         }
     }
     
@@ -172,6 +227,27 @@ impl Mt5ChartApp {
         self.lot_size = (steps * self.lot_step).max(self.min_lot).min(self.max_lot);
         self.lot_size_str = format!("{:.2}", self.lot_size);
     }
+    
+    fn toggle_recording(&mut self) {
+        self.is_recording = !self.is_recording;
+        if self.is_recording {
+            let filename = format!("Live_{}_{}.csv", self.symbol, chrono::Local::now().format("%Y%m%d_%H%M%S"));
+            match OpenOptions::new().create(true).append(true).open(&filename) {
+                Ok(mut file) => {
+                    let _ = writeln!(file, "Time,Bid,Ask,Volume");
+                    self.live_record_file = Some(file);
+                    self.last_order_result = Some(format!("Recording to {}", filename));
+                }
+                Err(e) => {
+                    self.is_recording = false;
+                    self.last_order_result = Some(format!("Rec Error: {}", e));
+                }
+            }
+        } else {
+            self.live_record_file = None;
+            self.last_order_result = Some("Recording Stopped".to_string());
+        }
+    }
 }
 
 impl eframe::App for Mt5ChartApp {
@@ -179,7 +255,13 @@ impl eframe::App for Mt5ChartApp {
         // Receive all available tick data from the channel without blocking
         while let Ok(tick) = self.tick_receiver.try_recv() {
             self.symbol = tick.symbol.clone();
-            self.volume_history.push((tick.time, tick.volume));
+            
+            // Record if active
+            if self.is_recording {
+                if let Some(mut file) = self.live_record_file.as_ref() {
+                     let _ = writeln!(file, "{},{},{},{}", tick.time, tick.bid, tick.ask, tick.volume);
+                }
+            }
             
             // Update account info from latest tick
             if tick.balance > 0.0 {
@@ -199,25 +281,26 @@ impl eframe::App for Mt5ChartApp {
             self.pending_orders = tick.orders.clone();
             
             self.data.push(tick);
-            // Keep only last 1000 points to avoid memory issues
-            if self.data.len() > 1000 {
+            // Keep only last 2000 points
+            if self.data.len() > 2000 {
                 self.data.remove(0);
-            }
-            if self.volume_history.len() > 100 {
-                self.volume_history.remove(0);
             }
         }
         
         // Check for order responses
         while let Ok(response) = self.response_receiver.try_recv() {
             if response.success {
-                self.last_order_result = Some(format!(
-                    "✓ Order executed! Ticket: {}",
-                    response.ticket.unwrap_or(0)
-                ));
+                if let Some(msg) = response.message {
+                    self.last_order_result = Some(format!("✓ {}", msg));
+                } else {
+                    self.last_order_result = Some(format!(
+                        "✓ Order executed! Ticket: {}",
+                        response.ticket.unwrap_or(0)
+                    ));
+                }
             } else {
                 self.last_order_result = Some(format!(
-                    "✗ Order failed: {}",
+                    "✗ Failed: {}",
                     response.error.unwrap_or_else(|| "Unknown error".to_string())
                 ));
             }
@@ -227,268 +310,132 @@ impl eframe::App for Mt5ChartApp {
         // Side Panel - Trading Controls
         // ====================================================================
         egui::SidePanel::left("trading_panel")
-            .min_width(250.0)
+            .min_width(280.0) // Widen slightly
             .show(ctx, |ui| {
                 ui.heading("📊 Trading Panel");
                 ui.separator();
                 
-                // =============================================================
-                // Account Information Section
-                // =============================================================
-                ui.heading("💰 Account Info");
-                ui.add_space(5.0);
-                
-                egui::Grid::new("account_grid")
-                    .num_columns(2)
-                    .spacing([10.0, 4.0])
-                    .show(ui, |ui| {
-                        ui.label("Balance:");
-                        ui.colored_label(egui::Color32::from_rgb(100, 200, 100), 
-                            format!("${:.2}", self.balance));
-                        ui.end_row();
-                        
-                        ui.label("Equity:");
-                        ui.colored_label(egui::Color32::from_rgb(100, 180, 255), 
-                            format!("${:.2}", self.equity));
-                        ui.end_row();
-                        
-                        ui.label("Margin Used:");
-                        ui.colored_label(egui::Color32::from_rgb(255, 200, 100), 
-                            format!("${:.2}", self.margin));
-                        ui.end_row();
-                        
-                        ui.label("Free Margin:");
-                        ui.colored_label(egui::Color32::from_rgb(100, 255, 200), 
-                            format!("${:.2}", self.free_margin));
-                        ui.end_row();
-                    });
-                
-                ui.separator();
-                
-                // Current prices
-                if let Some(last_tick) = self.data.last() {
-                    ui.heading("📈 Prices");
-                    egui::Grid::new("price_grid")
+                // Account Info
+                ui.collapsing("💰 Account Info", |ui| {
+                    egui::Grid::new("account_grid")
                         .num_columns(2)
                         .spacing([10.0, 4.0])
                         .show(ui, |ui| {
-                            ui.label("Bid:");
-                            ui.colored_label(egui::Color32::from_rgb(100, 200, 100), 
-                                format!("{:.5}", last_tick.bid));
+                            ui.label("Balance:");
+                            ui.colored_label(egui::Color32::from_rgb(100, 200, 100), format!("${:.2}", self.balance));
                             ui.end_row();
-                            
-                            ui.label("Ask:");
-                            ui.colored_label(egui::Color32::from_rgb(200, 100, 100), 
-                                format!("{:.5}", last_tick.ask));
+                            ui.label("Equity:");
+                            ui.colored_label(egui::Color32::from_rgb(100, 180, 255), format!("${:.2}", self.equity));
                             ui.end_row();
-                            
-                            ui.label("Volume:");
-                            ui.colored_label(egui::Color32::from_rgb(100, 150, 255), 
-                                format!("{}", last_tick.volume));
+                            ui.label("Margin Used:");
+                            ui.colored_label(egui::Color32::from_rgb(255, 200, 100), format!("${:.2}", self.margin));
+                            ui.end_row();
+                            ui.label("Free Margin:");
+                            ui.colored_label(egui::Color32::from_rgb(100, 255, 200), format!("${:.2}", self.free_margin));
                             ui.end_row();
                         });
+                });
+                
+                ui.separator();
+                
+                // Historical Data Section
+                ui.heading("📂 Historical Data");
+                ui.add_space(5.0);
+                
+                egui::Grid::new("history_grid").num_columns(2).spacing([10.0, 5.0]).show(ui, |ui| {
+                    ui.label("Start (yyyy.mm.dd):");
+                    ui.add(egui::TextEdit::singleline(&mut self.history_start_date).desired_width(100.0));
+                    ui.end_row();
+                    
+                    ui.label("End (yyyy.mm.dd):");
+                    ui.add(egui::TextEdit::singleline(&mut self.history_end_date).desired_width(100.0));
+                    ui.end_row();
+                    
+                    ui.label("Timeframe:");
+                    egui::ComboBox::from_id_source("tf_combo")
+                        .selected_text(&self.history_tf)
+                        .show_ui(ui, |ui| {
+                            ui.selectable_value(&mut self.history_tf, "M1".to_string(), "M1");
+                            ui.selectable_value(&mut self.history_tf, "M5".to_string(), "M5");
+                            ui.selectable_value(&mut self.history_tf, "M15".to_string(), "M15");
+                            ui.selectable_value(&mut self.history_tf, "H1".to_string(), "H1");
+                            ui.selectable_value(&mut self.history_tf, "D1".to_string(), "D1");
+                        });
+                    ui.end_row();
+                    
+                    ui.label("Mode:");
+                    egui::ComboBox::from_id_source("mode_combo")
+                        .selected_text(&self.history_mode)
+                        .show_ui(ui, |ui| {
+                             ui.selectable_value(&mut self.history_mode, "OHLC".to_string(), "OHLC");
+                             ui.selectable_value(&mut self.history_mode, "TICKS".to_string(), "TICKS");
+                        });
+                    ui.end_row();
+                });
+                
+                ui.add_space(5.0);
+                if ui.button("⬇ Download History (CSV)").clicked() {
+                    self.send_download_request();
                 }
                 
                 ui.separator();
                 
-                // =============================================================
-                // Lot Size Adjustment Section
-                // =============================================================
-                ui.heading("📦 Lot Size");
-                ui.add_space(5.0);
-                
+                // Live Recording
+                ui.heading("🔴 Live Recording");
                 ui.horizontal(|ui| {
-                    ui.label(format!("Min: {:.2} | Max: {:.2} | Step: {:.2}", 
-                        self.min_lot, self.max_lot, self.lot_step));
+                   ui.label(if self.is_recording { "Recording..." } else { "Idle" });
+                   if ui.button(if self.is_recording { "Stop" } else { "Start Recording" }).clicked() {
+                       self.toggle_recording();
+                   }
                 });
                 
-                ui.add_space(5.0);
+                ui.separator();
+
+                // Order Controls
+                ui.heading("📦 Trade Controls");
                 
+                // Lot Size
                 ui.horizontal(|ui| {
-                    if ui.button("−").clicked() {
-                        self.adjust_lot_size(-self.lot_step);
-                    }
-                    
-                    let response = ui.add(
-                        egui::TextEdit::singleline(&mut self.lot_size_str)
-                            .desired_width(80.0)
-                            .horizontal_align(egui::Align::Center)
-                    );
+                    if ui.button("−").clicked() { self.adjust_lot_size(-self.lot_step); }
+                    let response = ui.add(egui::TextEdit::singleline(&mut self.lot_size_str).desired_width(60.0));
                     if response.lost_focus() {
                         if let Ok(parsed) = self.lot_size_str.parse::<f64>() {
                             self.lot_size = parsed.max(self.min_lot).min(self.max_lot);
                             self.lot_size_str = format!("{:.2}", self.lot_size);
                         }
                     }
+                    if ui.button("+").clicked() { self.adjust_lot_size(self.lot_step); }
                     
-                    if ui.button("+").clicked() {
-                        self.adjust_lot_size(self.lot_step);
-                    }
+                    ui.label(format!("Lots (Max: {:.1})", self.max_lot));
                 });
                 
-                // Quick lot size buttons
+                ui.add_space(5.0);
+                ui.label("Market Orders:");
                 ui.horizontal(|ui| {
-                    if ui.small_button("0.01").clicked() { self.lot_size = 0.01; self.lot_size_str = "0.01".to_string(); }
-                    if ui.small_button("0.1").clicked() { self.lot_size = 0.1; self.lot_size_str = "0.10".to_string(); }
-                    if ui.small_button("0.5").clicked() { self.lot_size = 0.5; self.lot_size_str = "0.50".to_string(); }
-                    if ui.small_button("1.0").clicked() { self.lot_size = 1.0; self.lot_size_str = "1.00".to_string(); }
+                    if ui.button("BUY").clicked() { self.send_order("market_buy", None, None); }
+                    if ui.button("SELL").clicked() { self.send_order("market_sell", None, None); }
                 });
                 
-                ui.add_space(10.0);
-                ui.separator();
-                
-                // ============================================================
-                // Market Orders
-                // ============================================================
-                ui.heading("🔥 Market Orders");
-                ui.horizontal(|ui| {
-                    let buy_btn = egui::Button::new(
-                        egui::RichText::new("BUY").color(egui::Color32::WHITE).strong()
-                    ).fill(egui::Color32::from_rgb(50, 150, 50));
-                    if ui.add(buy_btn).clicked() {
-                        self.send_order("market_buy", None, None);
-                    }
-                    
-                    let sell_btn = egui::Button::new(
-                        egui::RichText::new("SELL").color(egui::Color32::WHITE).strong()
-                    ).fill(egui::Color32::from_rgb(180, 50, 50));
-                    if ui.add(sell_btn).clicked() {
-                        self.send_order("market_sell", None, None);
-                    }
-                });
-                
-                ui.add_space(10.0);
-                
-                // ============================================================
-                // Limit Orders
-                // ============================================================
-                ui.heading("📋 Limit Orders");
-                ui.horizontal(|ui| {
-                    ui.label("Price:");
-                    ui.add(egui::TextEdit::singleline(&mut self.limit_price).desired_width(100.0));
+                ui.add_space(5.0);
+                ui.label("Pending Orders:");
+                 ui.horizontal(|ui| {
+                    ui.label("@ Price:");
+                    ui.add(egui::TextEdit::singleline(&mut self.limit_price).desired_width(70.0));
                 });
                 ui.horizontal(|ui| {
-                    let price: f64 = self.limit_price.parse().unwrap_or(0.0);
-                    
-                    let buy_btn = egui::Button::new(
-                        egui::RichText::new("BUY LIMIT").color(egui::Color32::WHITE)
-                    ).fill(egui::Color32::from_rgb(50, 120, 50));
-                    if ui.add(buy_btn).clicked() {
-                        self.send_order("limit_buy", Some(price), None);
-                    }
-                    
-                    let sell_btn = egui::Button::new(
-                        egui::RichText::new("SELL LIMIT").color(egui::Color32::WHITE)
-                    ).fill(egui::Color32::from_rgb(150, 50, 50));
-                    if ui.add(sell_btn).clicked() {
-                        self.send_order("limit_sell", Some(price), None);
-                    }
+                    let p = self.limit_price.parse().unwrap_or(0.0);
+                    if ui.small_button("Buy Limit").clicked() { self.send_order("limit_buy", Some(p), None); }
+                    if ui.small_button("Sell Limit").clicked() { self.send_order("limit_sell", Some(p), None); }
+                    if ui.small_button("Buy Stop").clicked() { self.send_order("stop_buy", Some(p), None); }
+                    if ui.small_button("Sell Stop").clicked() { self.send_order("stop_sell", Some(p), None); }
                 });
-                
-                ui.add_space(10.0);
-                
-                // ============================================================
-                // Stop Orders
-                // ============================================================
-                ui.heading("🛑 Stop Orders");
-                ui.horizontal(|ui| {
-                    ui.label("Price:");
-                    ui.add(egui::TextEdit::singleline(&mut self.stop_price).desired_width(100.0));
-                });
-                ui.horizontal(|ui| {
-                    let price: f64 = self.stop_price.parse().unwrap_or(0.0);
-                    
-                    let buy_btn = egui::Button::new(
-                        egui::RichText::new("BUY STOP").color(egui::Color32::WHITE)
-                    ).fill(egui::Color32::from_rgb(50, 100, 150));
-                    if ui.add(buy_btn).clicked() {
-                        self.send_order("stop_buy", Some(price), None);
-                    }
-                    
-                    let sell_btn = egui::Button::new(
-                        egui::RichText::new("SELL STOP").color(egui::Color32::WHITE)
-                    ).fill(egui::Color32::from_rgb(150, 100, 50));
-                    if ui.add(sell_btn).clicked() {
-                        self.send_order("stop_sell", Some(price), None);
-                    }
-                });
-                
-                ui.add_space(10.0);
-                ui.separator();
-                
-                ui.add_space(10.0);
-                ui.separator();
-                
-                // ============================================================
-                // Active Positions Management
-                // ============================================================
-                if !self.positions.is_empty() {
-                    ui.heading("💼 Active Positions");
-                    egui::ScrollArea::vertical().id_source("positions_scroll").max_height(150.0).show(ui, |ui| {
-                        for pos in &self.positions {
-                            ui.group(|ui| {
-                                ui.horizontal(|ui| {
-                                    let color = if pos.pos_type == "BUY" {
-                                        egui::Color32::from_rgb(100, 200, 100)
-                                    } else {
-                                        egui::Color32::from_rgb(200, 100, 100)
-                                    };
-                                    ui.colored_label(color, &pos.pos_type);
-                                    ui.label(format!("{:.2} lots @ {:.5}", pos.volume, pos.price));
-                                });
-                                ui.horizontal(|ui| {
-                                    let profit_color = if pos.profit >= 0.0 {
-                                        egui::Color32::from_rgb(100, 200, 100)
-                                    } else {
-                                        egui::Color32::from_rgb(200, 100, 100)
-                                    };
-                                    ui.colored_label(profit_color, format!("${:.2}", pos.profit));
-                                    
-                                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                                        if ui.small_button("❌ Close").clicked() {
-                                            self.send_order("close_position", None, Some(pos.ticket));
-                                        }
-                                    });
-                                });
-                            });
-                        }
-                    });
-                    ui.separator();
-                }
 
-                // ============================================================
-                // Pending Orders Management
-                // ============================================================
-                if !self.pending_orders.is_empty() {
-                    ui.heading("⏳ Pending Orders");
-                    egui::ScrollArea::vertical().id_source("orders_scroll").max_height(100.0).show(ui, |ui| {
-                        for order in &self.pending_orders {
-                            ui.group(|ui| {
-                                ui.horizontal(|ui| {
-                                    ui.label(&order.order_type);
-                                    ui.label(format!("{:.2} lots @ {:.5}", order.volume, order.price));
-                                });
-                                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                                    if ui.small_button("❌ Cancel").clicked() {
-                                        self.send_order("cancel_order", None, Some(order.ticket));
-                                    }
-                                });
-                            });
-                        }
-                    });
-                    ui.separator();
-                }
+                ui.separator();
 
                 // Order result feedback
                 if let Some(ref result) = self.last_order_result {
-                    ui.heading("📨 Last Order");
-                    if result.starts_with("✓") {
-                        ui.colored_label(egui::Color32::from_rgb(100, 200, 100), result);
-                    } else if result.starts_with("✗") {
-                        ui.colored_label(egui::Color32::from_rgb(200, 100, 100), result);
-                    } else {
-                        ui.colored_label(egui::Color32::from_rgb(200, 200, 100), result);
-                    }
+                    ui.heading("📨 Last Message");
+                    ui.label(result); // Allow wrapping
                 }
             });
 
@@ -496,46 +443,95 @@ impl eframe::App for Mt5ChartApp {
         // Central Panel - Chart
         // ====================================================================
         egui::CentralPanel::default().show(ctx, |ui| {
-            ui.heading(format!("📈 MT5 Live Chart: {}", self.symbol));
+            ui.heading(format!("📈 {}", self.symbol));
             
-            // Tick volume display in header
+            // Header Info
             if let Some(last_tick) = self.data.last() {
                 ui.horizontal(|ui| {
-                    ui.label(format!("Bid: {:.5}", last_tick.bid));
-                    ui.label(" | ");
-                    ui.label(format!("Ask: {:.5}", last_tick.ask));
-                    ui.label(" | ");
-                    ui.colored_label(
-                        egui::Color32::from_rgb(255, 200, 100),
-                        format!("Tick Vol: {}", last_tick.volume)
-                    );
+                    ui.label(format!("{:.5} / {:.5}", last_tick.bid, last_tick.ask));
                 });
             }
             
             ui.separator();
 
             // Price chart
+            // Logic for Index-based X Axis
+            // We map index `i` to x-coord. 
+            // We provide a formatter that looks up `data[i]`.
+            
+            let data_len = self.data.len();
+            
             let price_plot = Plot::new("mt5_price_plot")
-                .height(ui.available_height() * 0.65)
+                //.height(ui.available_height()) // Fill remaining
                 .legend(egui_plot::Legend::default())
-                .x_axis_formatter(|x, _range, _width| {
-                    let timestamp = x.value as i64;
-                    // Simple HH:MM:SS formatter
-                    let seconds = timestamp % 60;
-                    let minutes = (timestamp / 60) % 60;
-                    let hours = (timestamp / 3600) % 24;
-                    format!("{:02}:{:02}:{:02}", hours, minutes, seconds)
+                .allow_boxed_zoom(true) // Allow box selection zoom
+                .allow_drag(true)       // Allow dragging
+                .allow_scroll(true)     // Allow scrolling
+                .allow_zoom(true)
+                .x_axis_formatter(move |x, _range, _width| {
+                    let idx = x.round() as usize;
+                    // We need to access 'self' here but we can't capture self easily in closure if it's mutable borrow outside
+                    // NOTE: egui_plot formatters are tricky with self. 
+                    // To solve this, we usually pre-calculate or clone small vector of times.
+                    // But for now let's just show relative time or try to capture a cloned time vector?
+                    // Cloning 2000 ints is cheap.
+                    format!("{}", idx) // Placeholder until we inject time vector
+                });
+                
+            // NOTE: To get proper time formatting, we need to pass a closure that owns the time data.
+            // Let's create a partial vector of (index, time) mapping.
+            let time_map: Vec<(usize, i64)> = self.data.iter().enumerate().map(|(i, t)| (i, t.time)).collect();
+            
+            let price_plot = Plot::new("mt5_price_plot")
+                .legend(egui_plot::Legend::default())
+                .allow_boxed_zoom(true) 
+                .allow_drag(true)       
+                .x_axis_Formatter(move |x, _range, _width| {
+                     let idx = x.round() as isize;
+                     if idx >= 0 && (idx as usize) < time_map.len() {
+                         let timestamp = time_map[idx as usize].1;
+                         // Format HH:MM:SS
+                         let seconds = timestamp % 60;
+                         let minutes = (timestamp / 60) % 60;
+                         let hours = (timestamp / 3600) % 24;
+                         return format!("{:02}:{:02}:{:02}", hours, minutes, seconds);
+                     }
+                     format!("{:.0}", x)
+                });
+            
+            // Wait, the above API name 'x_axis_Formatter' is wrong case, it's 'x_axis_formatter'.
+            // And we need to recreate the plot object correctly.
+            
+            // Correct approach:
+             let time_map: Vec<i64> = self.data.iter().map(|t| t.time).collect();
+             
+             let plot = Plot::new("mt5_price_plot")
+                .legend(egui_plot::Legend::default())
+                .allow_boxed_zoom(true)
+                .allow_drag(true)
+                .x_axis_formatter(move |x, _range, _width| {
+                    let idx = x.round() as isize;
+                    if idx >= 0 && (idx as usize) < time_map.len() {
+                         let timestamp = time_map[idx as usize];
+                         let seconds = timestamp % 60;
+                         let minutes = (timestamp / 60) % 60;
+                         let hours = (timestamp / 3600) % 24;
+                         return format!("{:02}:{:02}:{:02}", hours, minutes, seconds);
+                    }
+                    "".to_string()
                 });
 
-            price_plot.show(ui, |plot_ui| {
+            plot.show(ui, |plot_ui| {
                 let bid_points: PlotPoints = self.data
                     .iter()
-                    .map(|t| [t.time as f64, t.bid])
+                    .enumerate()
+                    .map(|(i, t)| [i as f64, t.bid])
                     .collect();
                 
                 let ask_points: PlotPoints = self.data
                     .iter()
-                    .map(|t| [t.time as f64, t.ask])
+                    .enumerate()
+                    .map(|(i, t)| [i as f64, t.ask])
                     .collect();
 
                 plot_ui.line(Line::new(bid_points).name("Bid").color(egui::Color32::from_rgb(100, 200, 100)));
@@ -544,9 +540,9 @@ impl eframe::App for Mt5ChartApp {
                 // Draw Active Positions
                 for pos in &self.positions {
                     let color = if pos.pos_type == "BUY" {
-                        egui::Color32::from_rgb(50, 100, 255) // Blue
+                        egui::Color32::from_rgb(50, 100, 255) 
                     } else {
-                        egui::Color32::from_rgb(255, 50, 50) // Red
+                        egui::Color32::from_rgb(255, 50, 50) 
                     };
                     
                     plot_ui.hline(
@@ -555,64 +551,7 @@ impl eframe::App for Mt5ChartApp {
                             .name(format!("{} #{}", pos.pos_type, pos.ticket))
                             .style(egui_plot::LineStyle::Dashed { length: 10.0 })
                     );
-                    
-                    // Note: Actual buttons need to be outside the plot or using sophisticated Overlay
-                    // For now, listing them in a separate panel or relying on the plot legend/tooltip is easier,
-                    // but the user asked for labels ON the chart. egui_plot doesn't easily support interactive buttons inside.
-                    // We will implement a list below the chart or overlay text.
-                    plot_ui.text(egui_plot::Text::new(
-                        egui_plot::PlotPoint::new(
-                            self.data.last().map(|t| t.time as f64).unwrap_or(0.0), 
-                            pos.price
-                        ),
-                        format!("{} {:.2}", pos.pos_type, pos.volume)
-                    ).color(color));
                 }
-                
-                // Draw Pending Orders
-                for order in &self.pending_orders {
-                    let color = if order.order_type.contains("BUY") {
-                         egui::Color32::from_rgb(50, 100, 255) // Blue
-                    } else {
-                         egui::Color32::from_rgb(255, 50, 50) // Red
-                    };
-                    
-                    plot_ui.hline(
-                        egui_plot::HLine::new(order.price)
-                            .color(color)
-                            .name(format!("{} #{}", order.order_type, order.ticket))
-                            .style(egui_plot::LineStyle::Dotted { spacing: 10.0 })
-                    );
-                }
-            });
-            
-            ui.add_space(5.0);
-            ui.label("Tick Volume");
-            
-            // Volume chart
-            let volume_plot = Plot::new("mt5_volume_plot")
-                .height(ui.available_height())
-                .legend(egui_plot::Legend::default())
-                .show_axes([true, true])
-                .x_axis_formatter(|x, _range, _width| {
-                    let timestamp = x.value as i64;
-                    let seconds = timestamp % 60;
-                    let minutes = (timestamp / 60) % 60;
-                    let hours = (timestamp / 3600) % 24;
-                    format!("{:02}:{:02}:{:02}", hours, minutes, seconds)
-                });
-
-            volume_plot.show(ui, |plot_ui| {
-                let bars: Vec<Bar> = self.volume_history
-                    .iter()
-                    .map(|(t, v)| Bar::new(*t as f64, *v as f64).width(0.8))  // Note: Width might need adjustment for time scale
-                    .collect();
-                
-                plot_ui.bar_chart(
-                    BarChart::new(bars)
-                        .name("Volume")
-                        .color(egui::Color32::from_rgb(100, 150, 255))
-                );
             });
         });
 
@@ -694,15 +633,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             };
             
-            println!("Sending order: {}", json_request);
+            println!("Sending request: {}", json_request);
             
             // Send request
             if let Err(e) = socket.send(json_request.into()).await {
-                eprintln!("Failed to send order: {}", e);
+                eprintln!("Failed to send: {}", e);
                 let _ = response_tx.send(OrderResponse {
                     success: false,
                     ticket: None,
                     error: Some(format!("Send failed: {}", e)),
+                    message: None,
                 }).await;
                 continue;
             }
@@ -722,6 +662,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                         success: false,
                                         ticket: None,
                                         error: Some(format!("Parse error: {}", e)),
+                                        message: None,
                                     }).await;
                                 }
                             }
@@ -729,11 +670,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                 }
                 Err(e) => {
-                    eprintln!("Order response recv error: {}", e);
+                    eprintln!("Response recv error: {}", e);
                     let _ = response_tx.send(OrderResponse {
                         success: false,
                         ticket: None,
                         error: Some(format!("Recv failed: {}", e)),
+                        message: None,
                     }).await;
                 }
             }

@@ -156,6 +156,17 @@ string ProcessOrderRequest(string request)
          errorMsg = "Invalid ticket for cancel_order";
       }
    }
+   else if(orderType == "download_history") {
+       // Format: {type: "download_history", symbol: "XAUUSD", timeframe: "M1", start: "2024.01.01", end: "2024.01.02", mode: "OHLC"|"TICKS"}
+       string tfStr = ExtractJsonString(request, "timeframe");
+       string startStr = ExtractJsonString(request, "start");
+       string endStr = ExtractJsonString(request, "end");
+       string mode = ExtractJsonString(request, "mode");
+       
+       if(mode == "") mode = "OHLC";
+       
+       success = DownloadHistory(symbol, tfStr, startStr, endStr, mode, errorMsg);
+   }
    else {
       errorMsg = "Unknown order type: " + orderType;
    }
@@ -163,12 +174,99 @@ string ProcessOrderRequest(string request)
    // Build response JSON
    string response;
    if(success) {
-      StringConcatenate(response, "{\"success\":true,\"ticket\":", IntegerToString(resultTicket), "}");
+      if(orderType == "download_history") {
+          // ensure errorMsg contains the filename if success
+          StringConcatenate(response, "{\"success\":true,\"message\":\"", errorMsg, "\"}");
+      } else {
+          StringConcatenate(response, "{\"success\":true,\"ticket\":", IntegerToString(resultTicket), "}");
+      }
    } else {
       StringConcatenate(response, "{\"success\":false,\"error\":\"", errorMsg, "\"}");
    }
    
    return response;
+  }
+
+//+------------------------------------------------------------------+
+//| Download History to CSV                                          |
+//+------------------------------------------------------------------+
+bool DownloadHistory(string symbol, string tfStr, string startStr, string endStr, string mode, string &resultMsg)
+  {
+   datetime start = StringToTime(startStr);
+   datetime end = StringToTime(endStr);
+   if(start == 0) start = D'2024.01.01 00:00'; // Default fallback
+   if(end == 0) end = TimeCurrent();
+   
+   ENUM_TIMEFRAMES tf = PERIOD_M1;
+   if(tfStr == "M5") tf = PERIOD_M5;
+   else if(tfStr == "M15") tf = PERIOD_M15;
+   else if(tfStr == "H1") tf = PERIOD_H1;
+   else if(tfStr == "H4") tf = PERIOD_H4;
+   else if(tfStr == "D1") tf = PERIOD_D1;
+   
+   string filename = symbol + "_" + tfStr + "_" + mode + ".csv";
+   int fileHandle = FileOpen(filename, FILE_WRITE|FILE_CSV|FILE_ANSI, ",");
+   
+   if(fileHandle == INVALID_HANDLE) {
+      resultMsg = "Failed to open file: " + filename;
+      return false;
+   }
+   
+   int count = 0;
+   
+   if(mode == "TICKS") {
+      MqlTick ticks[];
+      // CopyTicksRange is better for specific dates
+      int received = CopyTicksRange(symbol, ticks, COPY_TICKS_ALL, start * 1000, end * 1000);
+      
+      if(received > 0) {
+         FileWrite(fileHandle, "Time", "Bid", "Ask", "Last", "Volume", "Flags");
+         for(int i=0; i<received; i++) {
+            FileWrite(fileHandle, 
+               TimeToString(ticks[i].time, TIME_DATE|TIME_SECONDS), 
+               DoubleToString(ticks[i].bid, _Digits),
+               DoubleToString(ticks[i].ask, _Digits),
+               DoubleToString(ticks[i].last, _Digits),
+               IntegerToString(ticks[i].volume),
+               IntegerToString(ticks[i].flags)
+            );
+         }
+         count = received;
+      }
+   } 
+   else {
+      // OHLC
+      MqlRates rates[];
+      ArraySetAsSeries(rates, false); // Oldest first for CSV usually
+      int received = CopyRates(symbol, tf, start, end, rates);
+      
+      if(received > 0) {
+         FileWrite(fileHandle, "Time", "Open", "High", "Low", "Close", "TickVol", "Spread", "RealVol");
+         for(int i=0; i<received; i++) {
+            FileWrite(fileHandle, 
+               TimeToString(rates[i].time, TIME_DATE|TIME_MINUTES), 
+               DoubleToString(rates[i].open, _Digits),
+               DoubleToString(rates[i].high, _Digits),
+               DoubleToString(rates[i].low, _Digits),
+               DoubleToString(rates[i].close, _Digits),
+               IntegerToString(rates[i].tick_volume),
+               IntegerToString(rates[i].spread),
+               IntegerToString(rates[i].real_volume)
+            );
+         }
+         count = received;
+      }
+   }
+   
+   FileClose(fileHandle);
+   
+   if(count > 0) {
+      resultMsg = "Saved " + IntegerToString(count) + " records to " + filename;
+      return true;
+   } else {
+      resultMsg = "No data found for period";
+      return false; // Or true with warning? Let's say false to notify user
+   }
   }
 
 //+------------------------------------------------------------------+
