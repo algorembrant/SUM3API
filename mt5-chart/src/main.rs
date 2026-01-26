@@ -3,8 +3,9 @@ use egui_plot::{Line, Plot, PlotPoints};
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 use zeromq::{Socket, SocketRecv, SocketSend};
-use std::fs::OpenOptions;
+use std::fs::{self, OpenOptions};
 use std::io::Write;
+use std::path::PathBuf;
 
 // ============================================================================
 // Data Structures
@@ -81,6 +82,8 @@ struct OrderRequest {
     end: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     mode: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    request_id: Option<u64>,  // Unique ID for history downloads
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -89,6 +92,14 @@ struct OrderResponse {
     ticket: Option<i64>,
     error: Option<String>,
     message: Option<String>,
+}
+
+// Struct for tracking order execution breaklines on chart
+#[derive(Clone, Debug)]
+struct OrderBreakline {
+    index: usize,        // Data index where order was executed
+    order_type: String,  // "BUY" or "SELL" variant
+    ticket: i64,         // Order ticket number
 }
 
 // ============================================================================
@@ -135,6 +146,14 @@ struct Mt5ChartApp {
     // Live Trade Data
     positions: Vec<PositionData>,
     pending_orders: Vec<PendingOrderData>,
+    
+    // CSV Output Management
+    output_dir: PathBuf,
+    request_counter: u64,
+    
+    // Order Breaklines for Chart
+    order_breaklines: Vec<OrderBreakline>,
+    pending_order_type: Option<String>,  // Track what type of order is pending
 }
 
 impl Mt5ChartApp {
@@ -146,6 +165,10 @@ impl Mt5ChartApp {
         // Defaults dates to "yyyy.mm.dd"
         let now = chrono::Local::now();
         let today_str = now.format("%Y.%m.%d").to_string();
+        
+        // Ensure output directory exists
+        let output_dir = PathBuf::from("output");
+        fs::create_dir_all(&output_dir).ok();
         
         Self {
             tick_receiver,
@@ -176,12 +199,23 @@ impl Mt5ChartApp {
             
             positions: Vec::new(),
             pending_orders: Vec::new(),
+            
+            // Initialize new fields
+            output_dir,
+            request_counter: 0,
+            order_breaklines: Vec::new(),
+            pending_order_type: None,
         }
     }
     
     fn send_order(&mut self, order_type: &str, price: Option<f64>, ticket: Option<u64>) {
         let price_val = price.unwrap_or(0.0);
         let ticket_val = ticket.unwrap_or(0);
+        
+        // Track order type for breakline visualization (only for market orders)
+        if order_type.contains("market") {
+            self.pending_order_type = Some(order_type.to_string());
+        }
         
         let request = OrderRequest {
             order_type: order_type.to_string(),
@@ -193,12 +227,16 @@ impl Mt5ChartApp {
             start: None,
             end: None,
             mode: None,
+            request_id: None,
         };
         
         self.send_request_impl(request);
     }
     
     fn send_download_request(&mut self) {
+        // Increment counter for unique history download ID
+        self.request_counter += 1;
+        
         let request = OrderRequest {
             order_type: "download_history".to_string(),
             symbol: self.symbol.clone(),
@@ -209,6 +247,7 @@ impl Mt5ChartApp {
             start: Some(self.history_start_date.clone()),
             end: Some(self.history_end_date.clone()),
             mode: Some(self.history_mode.clone()),
+            request_id: Some(self.request_counter),
         };
         
         self.send_request_impl(request);
@@ -233,7 +272,15 @@ impl Mt5ChartApp {
     fn toggle_recording(&mut self) {
         self.is_recording = !self.is_recording;
         if self.is_recording {
-            let filename = format!("Live_{}_{}.csv", self.symbol, chrono::Local::now().format("%Y%m%d_%H%M%S"));
+            // Increment counter for unique ID
+            self.request_counter += 1;
+            let filename = format!(
+                "{}/Live_{}_ID{:04}_{}.csv",
+                self.output_dir.display(),
+                self.symbol.replace("/", "-"),
+                self.request_counter,
+                chrono::Local::now().format("%Y%m%d_%H%M%S")
+            );
             match OpenOptions::new().create(true).append(true).open(&filename) {
                 Ok(mut file) => {
                     let _ = writeln!(file, "Time,Bid,Ask,Volume");
@@ -292,6 +339,20 @@ impl eframe::App for Mt5ChartApp {
         // Check for order responses
         while let Ok(response) = self.response_receiver.try_recv() {
             if response.success {
+                // Add breakline for successful market orders
+                if let Some(ref order_type) = self.pending_order_type.take() {
+                    let breakline = OrderBreakline {
+                        index: self.data.len().saturating_sub(1),
+                        order_type: order_type.clone(),
+                        ticket: response.ticket.unwrap_or(0),
+                    };
+                    self.order_breaklines.push(breakline);
+                    // Keep only last 50 breaklines
+                    if self.order_breaklines.len() > 50 {
+                        self.order_breaklines.remove(0);
+                    }
+                }
+                
                 if let Some(msg) = response.message {
                     self.last_order_result = Some(format!("✓ {}", msg));
                 } else {
@@ -301,6 +362,7 @@ impl eframe::App for Mt5ChartApp {
                     ));
                 }
             } else {
+                self.pending_order_type = None; // Clear pending on failure
                 self.last_order_result = Some(format!(
                     "✗ Failed: {}",
                     response.error.unwrap_or_else(|| "Unknown error".to_string())
@@ -439,6 +501,58 @@ impl eframe::App for Mt5ChartApp {
                     ui.heading("📨 Last Message");
                     ui.label(result); // Allow wrapping
                 }
+                
+                ui.separator();
+                
+                // Active Positions - Close Management
+                ui.collapsing("💼 Active Positions", |ui| {
+                    if self.positions.is_empty() {
+                        ui.label("No active positions");
+                    } else {
+                        let positions_clone = self.positions.clone();
+                        for pos in positions_clone {
+                            ui.horizontal(|ui| {
+                                let color = if pos.pos_type == "BUY" {
+                                    egui::Color32::from_rgb(100, 200, 100)
+                                } else {
+                                    egui::Color32::from_rgb(255, 100, 100)
+                                };
+                                ui.colored_label(color, format!(
+                                    "#{} {} {:.2}@{:.5} P:{:.2}",
+                                    pos.ticket, pos.pos_type, pos.volume, pos.price, pos.profit
+                                ));
+                                if ui.small_button("Close").clicked() {
+                                    self.send_order("close_position", Some(pos.price), Some(pos.ticket));
+                                }
+                            });
+                        }
+                    }
+                });
+                
+                // Pending Orders - Cancel Management
+                ui.collapsing("⏳ Pending Orders", |ui| {
+                    if self.pending_orders.is_empty() {
+                        ui.label("No pending orders");
+                    } else {
+                        let orders_clone = self.pending_orders.clone();
+                        for order in orders_clone {
+                            ui.horizontal(|ui| {
+                                let color = if order.order_type.contains("BUY") {
+                                    egui::Color32::from_rgb(100, 150, 255)
+                                } else {
+                                    egui::Color32::from_rgb(255, 150, 100)
+                                };
+                                ui.colored_label(color, format!(
+                                    "#{} {} {:.2}@{:.5}",
+                                    order.ticket, order.order_type, order.volume, order.price
+                                ));
+                                if ui.small_button("Cancel").clicked() {
+                                    self.send_order("cancel_order", Some(order.price), Some(order.ticket));
+                                }
+                            });
+                        }
+                    }
+                });
             });
 
         // ====================================================================
@@ -493,7 +607,7 @@ impl eframe::App for Mt5ChartApp {
                 plot_ui.line(Line::new(bid_points).name("Bid").color(egui::Color32::from_rgb(100, 200, 100)));
                 plot_ui.line(Line::new(ask_points).name("Ask").color(egui::Color32::from_rgb(200, 100, 100)));
                 
-                // Draw Active Positions
+                // Draw Active Positions (horizontal lines)
                 for pos in &self.positions {
                     let color = if pos.pos_type == "BUY" {
                         egui::Color32::from_rgb(50, 100, 255) 
@@ -506,6 +620,22 @@ impl eframe::App for Mt5ChartApp {
                             .color(color)
                             .name(format!("{} #{}", pos.pos_type, pos.ticket))
                             .style(egui_plot::LineStyle::Dashed { length: 10.0 })
+                    );
+                }
+                
+                // Draw Order Breaklines (vertical lines at execution points)
+                for breakline in &self.order_breaklines {
+                    let color = if breakline.order_type.contains("buy") {
+                        egui::Color32::from_rgb(0, 200, 100) // Bright green for BUY
+                    } else {
+                        egui::Color32::from_rgb(255, 80, 80) // Bright red for SELL
+                    };
+                    
+                    plot_ui.vline(
+                        egui_plot::VLine::new(breakline.index as f64)
+                            .color(color)
+                            .name(format!("Order #{}", breakline.ticket))
+                            .width(2.0)
                     );
                 }
             });
