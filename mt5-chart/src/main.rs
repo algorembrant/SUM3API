@@ -519,7 +519,7 @@ impl eframe::App for Mt5ChartApp {
                 .height(ui.available_height() * 0.65)
                 .legend(egui_plot::Legend::default())
                 .x_axis_formatter(|x, _range, _width| {
-                    let timestamp = x as i64;
+                    let timestamp = x.value as i64;
                     // Simple HH:MM:SS formatter
                     let seconds = timestamp % 60;
                     let minutes = (timestamp / 60) % 60;
@@ -595,7 +595,7 @@ impl eframe::App for Mt5ChartApp {
                 .legend(egui_plot::Legend::default())
                 .show_axes([true, true])
                 .x_axis_formatter(|x, _range, _width| {
-                    let timestamp = x as i64;
+                    let timestamp = x.value as i64;
                     let seconds = timestamp % 60;
                     let minutes = (timestamp / 60) % 60;
                     let hours = (timestamp / 3600) % 24;
