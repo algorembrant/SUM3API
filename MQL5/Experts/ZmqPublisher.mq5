@@ -188,7 +188,7 @@ string ProcessOrderRequest(string request)
   }
 
 //+------------------------------------------------------------------+
-//| Download History to CSV                                          |
+//| Download History - Returns CSV content via ZMQ                   |
 //+------------------------------------------------------------------+
 bool DownloadHistory(string symbol, string tfStr, string startStr, string endStr, string mode, string &resultMsg)
   {
@@ -204,68 +204,56 @@ bool DownloadHistory(string symbol, string tfStr, string startStr, string endStr
    else if(tfStr == "H4") tf = PERIOD_H4;
    else if(tfStr == "D1") tf = PERIOD_D1;
    
-   string filename = symbol + "_" + tfStr + "_" + mode + ".csv";
-   int fileHandle = FileOpen(filename, FILE_WRITE|FILE_CSV|FILE_ANSI, ",");
-   
-   if(fileHandle == INVALID_HANDLE) {
-      resultMsg = "Failed to open file: " + filename;
-      return false;
-   }
-   
+   string csvContent = "";
    int count = 0;
    
    if(mode == "TICKS") {
       MqlTick ticks[];
-      // CopyTicksRange is better for specific dates
       int received = CopyTicksRange(symbol, ticks, COPY_TICKS_ALL, start * 1000, end * 1000);
       
       if(received > 0) {
-         FileWrite(fileHandle, "Time", "Bid", "Ask", "Last", "Volume", "Flags");
-         for(int i=0; i<received; i++) {
-            FileWrite(fileHandle, 
-               TimeToString(ticks[i].time, TIME_DATE|TIME_SECONDS), 
-               DoubleToString(ticks[i].bid, _Digits),
-               DoubleToString(ticks[i].ask, _Digits),
-               DoubleToString(ticks[i].last, _Digits),
-               IntegerToString(ticks[i].volume),
-               IntegerToString(ticks[i].flags)
-            );
+         csvContent = "Time,Bid,Ask,Last,Volume,Flags\n";
+         for(int i=0; i<received && i<50000; i++) {  // Limit to 50k rows for ZMQ
+            csvContent += TimeToString(ticks[i].time, TIME_DATE|TIME_SECONDS) + "," +
+                         DoubleToString(ticks[i].bid, _Digits) + "," +
+                         DoubleToString(ticks[i].ask, _Digits) + "," +
+                         DoubleToString(ticks[i].last, _Digits) + "," +
+                         IntegerToString(ticks[i].volume) + "," +
+                         IntegerToString(ticks[i].flags) + "\n";
          }
-         count = received;
+         count = MathMin(received, 50000);
       }
    } 
    else {
       // OHLC
       MqlRates rates[];
-      ArraySetAsSeries(rates, false); // Oldest first for CSV usually
+      ArraySetAsSeries(rates, false);
       int received = CopyRates(symbol, tf, start, end, rates);
       
       if(received > 0) {
-         FileWrite(fileHandle, "Time", "Open", "High", "Low", "Close", "TickVol", "Spread", "RealVol");
-         for(int i=0; i<received; i++) {
-            FileWrite(fileHandle, 
-               TimeToString(rates[i].time, TIME_DATE|TIME_MINUTES), 
-               DoubleToString(rates[i].open, _Digits),
-               DoubleToString(rates[i].high, _Digits),
-               DoubleToString(rates[i].low, _Digits),
-               DoubleToString(rates[i].close, _Digits),
-               IntegerToString(rates[i].tick_volume),
-               IntegerToString(rates[i].spread),
-               IntegerToString(rates[i].real_volume)
-            );
+         csvContent = "Time,Open,High,Low,Close,TickVol,Spread,RealVol\n";
+         for(int i=0; i<received && i<100000; i++) {  // Limit to 100k rows for OHLC
+            csvContent += TimeToString(rates[i].time, TIME_DATE|TIME_MINUTES) + "," +
+                         DoubleToString(rates[i].open, _Digits) + "," +
+                         DoubleToString(rates[i].high, _Digits) + "," +
+                         DoubleToString(rates[i].low, _Digits) + "," +
+                         DoubleToString(rates[i].close, _Digits) + "," +
+                         IntegerToString(rates[i].tick_volume) + "," +
+                         IntegerToString(rates[i].spread) + "," +
+                         IntegerToString(rates[i].real_volume) + "\n";
          }
-         count = received;
+         count = MathMin(received, 100000);
       }
    }
    
-   FileClose(fileHandle);
-   
    if(count > 0) {
-      resultMsg = "Saved " + IntegerToString(count) + " records to " + filename;
+      // Return CSV content in a special format that Rust can parse
+      // We use ||CSV_DATA|| as delimiter to separate count info from actual data
+      resultMsg = IntegerToString(count) + " records||CSV_DATA||" + csvContent;
       return true;
    } else {
       resultMsg = "No data found for period";
-      return false; // Or true with warning? Let's say false to notify user
+      return false;
    }
   }
 

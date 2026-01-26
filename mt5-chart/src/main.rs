@@ -154,6 +154,9 @@ struct Mt5ChartApp {
     // Order Breaklines for Chart
     order_breaklines: Vec<OrderBreakline>,
     pending_order_type: Option<String>,  // Track what type of order is pending
+    
+    // Pending history request info for CSV naming
+    pending_history_request: Option<(u64, String, String, String)>, // (id, symbol, tf, mode)
 }
 
 impl Mt5ChartApp {
@@ -205,6 +208,7 @@ impl Mt5ChartApp {
             request_counter: 0,
             order_breaklines: Vec::new(),
             pending_order_type: None,
+            pending_history_request: None,
         }
     }
     
@@ -236,6 +240,14 @@ impl Mt5ChartApp {
     fn send_download_request(&mut self) {
         // Increment counter for unique history download ID
         self.request_counter += 1;
+        
+        // Store request info for CSV filename generation when response arrives
+        self.pending_history_request = Some((
+            self.request_counter,
+            self.symbol.replace("/", "-"),
+            self.history_tf.clone(),
+            self.history_mode.clone(),
+        ));
         
         let request = OrderRequest {
             order_type: "download_history".to_string(),
@@ -339,23 +351,63 @@ impl eframe::App for Mt5ChartApp {
         // Check for order responses
         while let Ok(response) = self.response_receiver.try_recv() {
             if response.success {
-                // Add breakline for successful market orders
-                if let Some(ref order_type) = self.pending_order_type.take() {
-                    let breakline = OrderBreakline {
-                        index: self.data.len().saturating_sub(1),
-                        order_type: order_type.clone(),
-                        ticket: response.ticket.unwrap_or(0),
-                    };
-                    self.order_breaklines.push(breakline);
-                    // Keep only last 50 breaklines
-                    if self.order_breaklines.len() > 50 {
-                        self.order_breaklines.remove(0);
+                // Check if this is a history download with CSV data
+                if let Some(ref msg) = response.message {
+                    if msg.contains("||CSV_DATA||") {
+                        // Parse CSV data from response
+                        let parts: Vec<&str> = msg.splitn(2, "||CSV_DATA||").collect();
+                        if parts.len() == 2 {
+                            let info_part = parts[0];
+                            let csv_content = parts[1];
+                            
+                            // Generate filename using pending request info
+                            if let Some((id, symbol, tf, mode)) = self.pending_history_request.take() {
+                                let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S");
+                                let filename = format!(
+                                    "{}/History_{}_{}_{}_ID{:04}_{}.csv",
+                                    self.output_dir.display(),
+                                    symbol, tf, mode, id, timestamp
+                                );
+                                
+                                // Save CSV to output folder
+                                match std::fs::write(&filename, csv_content) {
+                                    Ok(_) => {
+                                        self.last_order_result = Some(format!(
+                                            "✓ {} → Saved to {}",
+                                            info_part, filename
+                                        ));
+                                    }
+                                    Err(e) => {
+                                        self.last_order_result = Some(format!(
+                                            "✗ Failed to save CSV: {}",
+                                            e
+                                        ));
+                                    }
+                                }
+                            } else {
+                                self.last_order_result = Some(format!("✓ {}", info_part));
+                            }
+                        } else {
+                            self.last_order_result = Some(format!("✓ {}", msg));
+                        }
+                    } else {
+                        self.last_order_result = Some(format!("✓ {}", msg));
                     }
-                }
-                
-                if let Some(msg) = response.message {
-                    self.last_order_result = Some(format!("✓ {}", msg));
                 } else {
+                    // Add breakline for successful market orders
+                    if let Some(ref order_type) = self.pending_order_type.take() {
+                        let breakline = OrderBreakline {
+                            index: self.data.len().saturating_sub(1),
+                            order_type: order_type.clone(),
+                            ticket: response.ticket.unwrap_or(0),
+                        };
+                        self.order_breaklines.push(breakline);
+                        // Keep only last 50 breaklines
+                        if self.order_breaklines.len() > 50 {
+                            self.order_breaklines.remove(0);
+                        }
+                    }
+                    
                     self.last_order_result = Some(format!(
                         "✓ Order executed! Ticket: {}",
                         response.ticket.unwrap_or(0)
@@ -363,6 +415,7 @@ impl eframe::App for Mt5ChartApp {
                 }
             } else {
                 self.pending_order_type = None; // Clear pending on failure
+                self.pending_history_request = None; // Clear pending history request
                 self.last_order_result = Some(format!(
                     "✗ Failed: {}",
                     response.error.unwrap_or_else(|| "Unknown error".to_string())

@@ -1,6 +1,6 @@
 # MT5 ZeroMQ Trading System - Architecture v5
 
-Complete data flow and component integration with **bidirectional ZeroMQ**, real-time tick data, order execution, CSV export, and chart visualization.
+Complete data flow with **bidirectional ZeroMQ**, real-time tick data, order execution, and CSV export to local output folder.
 
 ## System Overview
 
@@ -14,11 +14,11 @@ flowchart LR
 
     subgraph ZMQ["ZeroMQ Transport"]
         PUB["PUB :5555<br/>(Tick/Account/Positions)"]
-        REP["REP :5556<br/>(Orders/History)"]
+        REP["REP :5556<br/>(Orders/History CSV)"]
     end
 
     subgraph Rust["mt5-chart (Rust)"]
-        App["main.rs<br/>• egui/eframe GUI<br/>• zeromq SUB+REQ<br/>• tokio async<br/>• CSV export"]
+        App["main.rs<br/>• egui/eframe GUI<br/>• zeromq SUB+REQ<br/>• tokio async<br/>• CSV export to output/"]
     end
 
     DLL --> PUB --> App
@@ -37,7 +37,7 @@ sequenceDiagram
     loop Every Tick
         EA->>ZMQ: PUB JSON (tick+positions+orders)
         ZMQ->>App: SUB receive → Chart update
-        App->>App: Record to CSV (if enabled)
+        App->>App: Record to output/ CSV (if enabled)
     end
 
     Note over EA,App: Order Execution
@@ -46,9 +46,11 @@ sequenceDiagram
     EA->>ZMQ: REP {success, ticket}
     ZMQ->>App: Show result + Add breakline
 
-    Note over EA,App: History Download
-    App->>ZMQ: REQ {download_history, dates, TF}
-    EA->>ZMQ: REP {success, file path}
+    Note over EA,App: History Download (CSV via ZMQ)
+    App->>ZMQ: REQ {download_history, dates, TF, request_id}
+    EA->>EA: Generate CSV content
+    EA->>ZMQ: REP {success, "N records||CSV_DATA||...csv..."}
+    App->>App: Save to output/History_*.csv
 ```
 
 ## Data Structures
@@ -75,7 +77,7 @@ sequenceDiagram
 | `stop_buy/sell` | Pending stop | symbol, volume, price |
 | `close_position` | Close position | ticket |
 | `cancel_order` | Cancel pending | ticket |
-| `download_history` | Export CSV | start, end, timeframe, mode |
+| `download_history` | Get CSV data | start, end, timeframe, mode, request_id |
 
 ## UI Layout
 
@@ -98,23 +100,37 @@ flowchart LR
     end
 ```
 
-## New Features (v5)
+## CSV Export System
 
-### CSV Output Management
-- **Output folder**: `mt5-chart/output/` (auto-created)
-- **Filename format**: `Live_{symbol}_ID{counter}_{timestamp}.csv`
-- **Unique IDs**: Counter increments for each recording session
-- **Infinite downloads**: No limit on CSV exports
+### Output Folder
+All CSV files are saved to `mt5-chart/output/` (auto-created on startup).
 
-### Order Breaklines
-- **Visual indicator**: Vertical line on chart at order execution index
+### Live Recording
+- **Naming**: `Live_{symbol}_ID{counter}_{timestamp}.csv`
+- **Format**: `Time,Bid,Ask,Volume`
+- **Control**: Toggle button in sidebar
+
+### Historical Data Download
+- **Naming**: `History_{symbol}_{TF}_{mode}_ID{counter}_{timestamp}.csv`
+- **Format OHLC**: `Time,Open,High,Low,Close,TickVol,Spread,RealVol`
+- **Format TICKS**: `Time,Bid,Ask,Last,Volume,Flags`
+- **Data Flow**: MQL5 generates CSV → sends via ZMQ → Rust saves locally
+- **Limits**: 50k ticks or 100k OHLC bars per request
+
+### Unique ID System
+- Single `request_counter` shared by live recording and history downloads
+- Increments for each new request
+- Ensures unique filenames for infinite downloads
+
+## Order Breaklines
+- **Visual**: Vertical line on chart at order execution index
 - **Colors**: Green (BUY), Red (SELL)
-- **Label**: Order ticket number
+- **Label**: Order ticket number in legend
 - **Limit**: Last 50 breaklines displayed
 
-### Position/Order Management
-- **Active Positions**: List with Close button for each
-- **Pending Orders**: List with Cancel button for each
+## Position/Order Management
+- **Active Positions**: Collapsible section with Close button
+- **Pending Orders**: Collapsible section with Cancel button
 - **Color coded**: BUY (green), SELL (red)
 
 ## File Structure
@@ -123,8 +139,10 @@ flowchart LR
 mt5-chart/
 ├── Cargo.toml
 ├── src/
-│   └── main.rs          # Application + UI + ZMQ
-└── output/              # CSV export directory
+│   └── main.rs
+└── output/                    # All CSV exports
     ├── Live_XAUUSD_ID0001_20260126_120000.csv
-    └── Live_XAUUSD_ID0002_20260126_130000.csv
+    ├── Live_XAUUSD_ID0002_20260126_130000.csv
+    ├── History_XAUUSD_M1_OHLC_ID0003_20260126_131500.csv
+    └── History_XAUUSD_H1_TICKS_ID0004_20260126_140000.csv
 ```
