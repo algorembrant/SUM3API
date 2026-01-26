@@ -1,17 +1,17 @@
 use eframe::egui;
-use egui_plot::{Line, Plot, PlotPoints, Bar, BarChart, PlotBounds};
+use egui_plot::{Line, Plot, PlotPoints};
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 use zeromq::{Socket, SocketRecv, SocketSend};
 use std::fs::OpenOptions;
 use std::io::Write;
-use chrono::{DateTime, TimeZone, Utc};
 
 // ============================================================================
 // Data Structures
 // ============================================================================
 
 #[derive(Clone, Debug, Deserialize)]
+#[allow(dead_code)]
 struct PositionData {
     ticket: u64,
     #[serde(rename = "type")]
@@ -22,6 +22,7 @@ struct PositionData {
 }
 
 #[derive(Clone, Debug, Deserialize)]
+#[allow(dead_code)]
 struct PendingOrderData {
     ticket: u64,
     #[serde(rename = "type")]
@@ -117,6 +118,7 @@ struct Mt5ChartApp {
     lot_size: f64,
     lot_size_str: String,
     limit_price: String,
+    #[allow(dead_code)]
     stop_price: String,
     last_order_result: Option<String>,
     
@@ -454,69 +456,23 @@ impl eframe::App for Mt5ChartApp {
             
             ui.separator();
 
-            // Price chart
-            // Logic for Index-based X Axis
-            // We map index `i` to x-coord. 
-            // We provide a formatter that looks up `data[i]`.
+            // Price chart - Index-based X Axis
+            let time_map: Vec<i64> = self.data.iter().map(|t| t.time).collect();
             
-            let data_len = self.data.len();
-            
-            let price_plot = Plot::new("mt5_price_plot")
-                //.height(ui.available_height()) // Fill remaining
-                .legend(egui_plot::Legend::default())
-                .allow_boxed_zoom(true) // Allow box selection zoom
-                .allow_drag(true)       // Allow dragging
-                .allow_scroll(true)     // Allow scrolling
-                .allow_zoom(true)
-                .x_axis_formatter(move |x, _range, _width| {
-                    let idx = x.round() as usize;
-                    // We need to access 'self' here but we can't capture self easily in closure if it's mutable borrow outside
-                    // NOTE: egui_plot formatters are tricky with self. 
-                    // To solve this, we usually pre-calculate or clone small vector of times.
-                    // But for now let's just show relative time or try to capture a cloned time vector?
-                    // Cloning 2000 ints is cheap.
-                    format!("{}", idx) // Placeholder until we inject time vector
-                });
-                
-            // NOTE: To get proper time formatting, we need to pass a closure that owns the time data.
-            // Let's create a partial vector of (index, time) mapping.
-            let time_map: Vec<(usize, i64)> = self.data.iter().enumerate().map(|(i, t)| (i, t.time)).collect();
-            
-            let price_plot = Plot::new("mt5_price_plot")
-                .legend(egui_plot::Legend::default())
-                .allow_boxed_zoom(true) 
-                .allow_drag(true)       
-                .x_axis_Formatter(move |x, _range, _width| {
-                     let idx = x.round() as isize;
-                     if idx >= 0 && (idx as usize) < time_map.len() {
-                         let timestamp = time_map[idx as usize].1;
-                         // Format HH:MM:SS
-                         let seconds = timestamp % 60;
-                         let minutes = (timestamp / 60) % 60;
-                         let hours = (timestamp / 3600) % 24;
-                         return format!("{:02}:{:02}:{:02}", hours, minutes, seconds);
-                     }
-                     format!("{:.0}", x)
-                });
-            
-            // Wait, the above API name 'x_axis_Formatter' is wrong case, it's 'x_axis_formatter'.
-            // And we need to recreate the plot object correctly.
-            
-            // Correct approach:
-             let time_map: Vec<i64> = self.data.iter().map(|t| t.time).collect();
-             
-             let plot = Plot::new("mt5_price_plot")
+            let plot = Plot::new("mt5_price_plot")
                 .legend(egui_plot::Legend::default())
                 .allow_boxed_zoom(true)
                 .allow_drag(true)
+                .allow_scroll(true)
+                .allow_zoom(true)
                 .x_axis_formatter(move |x, _range, _width| {
-                    let idx = x.round() as isize;
+                    let idx = x.value.round() as isize;
                     if idx >= 0 && (idx as usize) < time_map.len() {
-                         let timestamp = time_map[idx as usize];
-                         let seconds = timestamp % 60;
-                         let minutes = (timestamp / 60) % 60;
-                         let hours = (timestamp / 3600) % 24;
-                         return format!("{:02}:{:02}:{:02}", hours, minutes, seconds);
+                        let timestamp = time_map[idx as usize];
+                        let seconds = timestamp % 60;
+                        let minutes = (timestamp / 60) % 60;
+                        let hours = (timestamp / 3600) % 24;
+                        return format!("{:02}:{:02}:{:02}", hours, minutes, seconds);
                     }
                     "".to_string()
                 });
