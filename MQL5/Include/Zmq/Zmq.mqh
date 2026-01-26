@@ -1,10 +1,11 @@
 //+------------------------------------------------------------------+
 //|                                                          Zmq.mqh |
-//|                                    Copyright 2024, Antigravity   |
+//|                                    Copyright 2026, Algorembrant  |
 //|                                                                  |
 //+------------------------------------------------------------------+
-#property copyright "Antigravity"
-#property link      ""
+#property copyright "Algorembrant"
+#property link      "https://github.com/algorembrant/SUM3API"
+#property version   "2.00"
 #property strict
 
 // Define ZMQ constants

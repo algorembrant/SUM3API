@@ -1,3 +1,13 @@
+//+------------------------------------------------------------------+
+//|                                                          main.rs |
+//|                                    Copyright 2026, Algorembrant  |
+//|                                                                  |
+//+------------------------------------------------------------------+
+//property copyright "Algorembrant"
+//property link      "https://github.com/algorembrant/SUM3API"
+//property version   "2.00"
+//property strict
+
 use eframe::egui;
 use egui_plot::{Line, Plot, PlotPoints};
 use serde::{Deserialize, Serialize};
