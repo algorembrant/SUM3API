@@ -138,7 +138,6 @@ impl Mt5ChartApp {
             lot_size_str: "0.01".to_string(),
             limit_price: "0.0".to_string(),
             stop_price: "0.0".to_string(),
-            stop_price: "0.0".to_string(),
             last_order_result: None,
             volume_history: Vec::new(),
             positions: Vec::new(),
@@ -519,7 +518,7 @@ impl eframe::App for Mt5ChartApp {
             let price_plot = Plot::new("mt5_price_plot")
                 .height(ui.available_height() * 0.65)
                 .legend(egui_plot::Legend::default())
-                .x_axis_formatter(|x, _range| {
+                .x_axis_formatter(|x, _range, _width| {
                     let timestamp = x as i64;
                     // Simple HH:MM:SS formatter
                     let seconds = timestamp % 60;
@@ -554,7 +553,7 @@ impl eframe::App for Mt5ChartApp {
                         egui_plot::HLine::new(pos.price)
                             .color(color)
                             .name(format!("{} #{}", pos.pos_type, pos.ticket))
-                            .style(egui_plot::LineStyle::Dashed)
+                            .style(egui_plot::LineStyle::Dashed { length: 10.0 })
                     );
                     
                     // Note: Actual buttons need to be outside the plot or using sophisticated Overlay
@@ -582,7 +581,7 @@ impl eframe::App for Mt5ChartApp {
                         egui_plot::HLine::new(order.price)
                             .color(color)
                             .name(format!("{} #{}", order.order_type, order.ticket))
-                            .style(egui_plot::LineStyle::Dotted)
+                            .style(egui_plot::LineStyle::Dotted { spacing: 10.0 })
                     );
                 }
             });
@@ -595,7 +594,7 @@ impl eframe::App for Mt5ChartApp {
                 .height(ui.available_height())
                 .legend(egui_plot::Legend::default())
                 .show_axes([true, true])
-                .x_axis_formatter(|x, _range| {
+                .x_axis_formatter(|x, _range, _width| {
                     let timestamp = x as i64;
                     let seconds = timestamp % 60;
                     let minutes = (timestamp / 60) % 60;
