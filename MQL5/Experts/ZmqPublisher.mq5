@@ -207,19 +207,20 @@ bool DownloadHistory(string symbol, string tfStr, string startStr, string endStr
    string csvContent = "";
    int count = 0;
    
+   // Use |NL| as line separator (JSON-safe, Rust will convert to real newlines)
+   string NL = "|NL|";
+   
    if(mode == "TICKS") {
       MqlTick ticks[];
       int received = CopyTicksRange(symbol, ticks, COPY_TICKS_ALL, start * 1000, end * 1000);
       
       if(received > 0) {
-         csvContent = "Time,Bid,Ask,Last,Volume,Flags\n";
-         for(int i=0; i<received && i<50000; i++) {  // Limit to 50k rows for ZMQ
+         csvContent = "Time,Bid,Ask,Volume" + NL;
+         for(int i=0; i<received && i<50000; i++) {  // Limit to 50k rows
             csvContent += TimeToString(ticks[i].time, TIME_DATE|TIME_SECONDS) + "," +
                          DoubleToString(ticks[i].bid, _Digits) + "," +
                          DoubleToString(ticks[i].ask, _Digits) + "," +
-                         DoubleToString(ticks[i].last, _Digits) + "," +
-                         IntegerToString(ticks[i].volume) + "," +
-                         IntegerToString(ticks[i].flags) + "\n";
+                         IntegerToString(ticks[i].volume) + NL;
          }
          count = MathMin(received, 50000);
       }
@@ -231,16 +232,15 @@ bool DownloadHistory(string symbol, string tfStr, string startStr, string endStr
       int received = CopyRates(symbol, tf, start, end, rates);
       
       if(received > 0) {
-         csvContent = "Time,Open,High,Low,Close,TickVol,Spread,RealVol\n";
-         for(int i=0; i<received && i<100000; i++) {  // Limit to 100k rows for OHLC
+         csvContent = "Time,Open,High,Low,Close,TickVol,Spread" + NL;
+         for(int i=0; i<received && i<100000; i++) {  // Limit to 100k rows
             csvContent += TimeToString(rates[i].time, TIME_DATE|TIME_MINUTES) + "," +
                          DoubleToString(rates[i].open, _Digits) + "," +
                          DoubleToString(rates[i].high, _Digits) + "," +
                          DoubleToString(rates[i].low, _Digits) + "," +
                          DoubleToString(rates[i].close, _Digits) + "," +
                          IntegerToString(rates[i].tick_volume) + "," +
-                         IntegerToString(rates[i].spread) + "," +
-                         IntegerToString(rates[i].real_volume) + "\n";
+                         IntegerToString(rates[i].spread) + NL;
          }
          count = MathMin(received, 100000);
       }

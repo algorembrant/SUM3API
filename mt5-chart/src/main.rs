@@ -369,8 +369,11 @@ impl eframe::App for Mt5ChartApp {
                                     symbol, tf, mode, id, timestamp
                                 );
                                 
+                                // Convert |NL| placeholders back to real newlines
+                                let csv_with_newlines = csv_content.replace("|NL|", "\n");
+                                
                                 // Save CSV to output folder
-                                match std::fs::write(&filename, csv_content) {
+                                match std::fs::write(&filename, csv_with_newlines) {
                                     Ok(_) => {
                                         self.last_order_result = Some(format!(
                                             "✓ {} → Saved to {}",

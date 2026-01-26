@@ -48,9 +48,9 @@ sequenceDiagram
 
     Note over EA,App: History Download (CSV via ZMQ)
     App->>ZMQ: REQ {download_history, dates, TF, request_id}
-    EA->>EA: Generate CSV content
+    EA->>EA: Generate CSV (|NL| as line separator)
     EA->>ZMQ: REP {success, "N records||CSV_DATA||...csv..."}
-    App->>App: Save to output/History_*.csv
+    App->>App: Convert |NL| → newlines, save to output/
 ```
 
 ## Data Structures
@@ -63,8 +63,7 @@ sequenceDiagram
   "balance": 10000.00, "equity": 10050.00,
   "margin": 200.00, "free_margin": 9850.00,
   "min_lot": 0.01, "max_lot": 100.00, "lot_step": 0.01,
-  "positions": [{"ticket": 12345, "type": "BUY", "volume": 1.0, "price": 2000.50, "profit": 50.0}],
-  "orders": [{"ticket": 12346, "type": "BUY LIMIT", "volume": 0.1, "price": 1990.00}]
+  "positions": [...], "orders": [...]
 }
 ```
 
@@ -95,7 +94,7 @@ flowchart LR
         end
         subgraph Main["Chart Panel"]
             H["Symbol + Bid/Ask"]
-            I["Price Chart<br/>• Bid/Ask Lines<br/>• Position HLines<br/>• Order VLines (Breaklines)"]
+            I["Price Chart<br/>• Bid/Ask Lines<br/>• Position HLines<br/>• Order VLines"]
         end
     end
 ```
@@ -103,46 +102,35 @@ flowchart LR
 ## CSV Export System
 
 ### Output Folder
-All CSV files are saved to `mt5-chart/output/` (auto-created on startup).
+All CSV files saved to `mt5-chart/output/` (auto-created on startup).
 
 ### Live Recording
 - **Naming**: `Live_{symbol}_ID{counter}_{timestamp}.csv`
 - **Format**: `Time,Bid,Ask,Volume`
-- **Control**: Toggle button in sidebar
 
 ### Historical Data Download
 - **Naming**: `History_{symbol}_{TF}_{mode}_ID{counter}_{timestamp}.csv`
-- **Format OHLC**: `Time,Open,High,Low,Close,TickVol,Spread,RealVol`
-- **Format TICKS**: `Time,Bid,Ask,Last,Volume,Flags`
-- **Data Flow**: MQL5 generates CSV → sends via ZMQ → Rust saves locally
+- **OHLC Format**: `Time,Open,High,Low,Close,TickVol,Spread`
+- **TICKS Format**: `Time,Bid,Ask,Volume`
+- **Transport**: CSV sent via ZMQ with `|NL|` line separators (JSON-safe)
 - **Limits**: 50k ticks or 100k OHLC bars per request
 
 ### Unique ID System
-- Single `request_counter` shared by live recording and history downloads
-- Increments for each new request
+- Single `request_counter` for live recording and history downloads
 - Ensures unique filenames for infinite downloads
 
 ## Order Breaklines
-- **Visual**: Vertical line on chart at order execution index
+- **Visual**: Vertical line at order execution index
 - **Colors**: Green (BUY), Red (SELL)
-- **Label**: Order ticket number in legend
 - **Limit**: Last 50 breaklines displayed
-
-## Position/Order Management
-- **Active Positions**: Collapsible section with Close button
-- **Pending Orders**: Collapsible section with Cancel button
-- **Color coded**: BUY (green), SELL (red)
 
 ## File Structure
 
 ```
 mt5-chart/
-├── Cargo.toml
-├── src/
-│   └── main.rs
-└── output/                    # All CSV exports
+├── src/main.rs
+└── output/
     ├── Live_XAUUSD_ID0001_20260126_120000.csv
-    ├── Live_XAUUSD_ID0002_20260126_130000.csv
-    ├── History_XAUUSD_M1_OHLC_ID0003_20260126_131500.csv
-    └── History_XAUUSD_H1_TICKS_ID0004_20260126_140000.csv
+    ├── History_XAUUSD_M1_OHLC_ID0002_20260126_131500.csv
+    └── History_XAUUSD_H1_TICKS_ID0003_20260126_140000.csv
 ```
