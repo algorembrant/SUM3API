@@ -72,7 +72,7 @@
 \end{figure}
 
 \begin{abstract}
-MetaTrader 5 (MT5), when connected to preferred exchanges or brokers, supports automated algorithmic trading via Expert Advisors (EAs) written in MetaQuotes Language (MQL5). While MetaQuotes LLC provides an official Python integration package, publicly documented methods for internally extracting and externally projecting MT5 financial data remain limited. To address this gap, we implemented a novel approach that bridges MQL5 and Rust via ZeroMQ publisher--subscriber and request--reply bindings. This benchmark-based methodology enables quantitative researchers, feature engineers, and algorithmic traders to develop trading systems leveraging MT5 data feeds using Rust, thereby bypassing the limitations inherent to pure MQL5 Expert Advisors. The methodology was validated through integration within a functional trading terminal application demonstrating low-latency capabilities including: real-time account information monitoring (balance, equity, free and used margin), downloadable historical data requests (OHLC bars and raw tick data), downloadable forward data streaming (live tick recording), trade execution controls (market, limit, and stop orders with lot sizing and cancellation), messaging and notifications for debugging \& recent calls, and a live microsecond-resolution raw tick-level bid/ask price formation chart. All resources are open-source and available on GitHub: \url{https://github.com/algorembrant/Rust-ZMQ-MT5}.
+MetaTrader 5 (MT5), when connected to preferred exchanges or brokers, supports automated algorithmic trading via Expert Advisors (EAs) written in MetaQuotes Language (MQL5). While MetaQuotes Ltd. provides an official Python integration package, publicly documented methods for internally extracting and externally projecting MT5 financial data remain limited. To address this gap, we implemented a novel approach that bridges MQL5 and Rust via ZeroMQ publisher--subscriber and request--reply bindings. This benchmark-based methodology enables quantitative researchers, feature engineers, and algorithmic traders to develop trading systems leveraging MT5 data feeds using Rust, thereby bypassing the limitations inherent to pure MQL5 Expert Advisors. The methodology was validated through integration within a functional trading terminal application demonstrating low-latency capabilities including: real-time account information monitoring (balance, equity, free and used margin), downloadable historical data requests (OHLC bars and raw tick data), downloadable forward data streaming (live tick recording), trade execution controls (market, limit, and stop orders with lot sizing and cancellation), messaging and notifications for debugging \& recent calls, and a live microsecond-resolution raw tick-level bid/ask price formation chart. All resources are open-source and available on GitHub: \url{https://github.com/algorembrant/SUM3API}.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -111,7 +111,7 @@ The primary objectives of this research were:
 
 \begin{enumerate}
     \item To design and implement a ZeroMQ-based communication bridge between MQL5 and Rust
-    \item To develop a reusable MQL5 wrapper library for ZeroMQ socket operations
+    \item To develop a reusable MQL5 \& Rust wrapper library for ZeroMQ socket operations
     \item To create a functional Rust-based trading terminal demonstrating real-time data consumption and order execution
     \item To document the methodology with sufficient detail for reproducibility\textsuperscript{\hyperref[sec:a2]{A2}}
 \end{enumerate}
@@ -601,7 +601,7 @@ Future development directions include:
 
 We conducted this research as independent researchers (non-affiliated with professionally known institutions). Developing this study from scratch to final distribution required considerable time, but with the help of xAI's Grok for searching for facts \cite{grok2024}, Google's Gemini Pro \cite{gemini2024}, and Anthropic's Claude \cite{claude2024} inside Google Antigravity, we were able to complete this work. We thank all the mentioned companies; if it were not for their masterpiece, we would have had a very hard time completing this work.
 
-We acknowledge the ZeroMQ community for providing the robust messaging library that forms the foundation of this work, and the Rust community for the excellent async ecosystem enabling this implementation. If it were not for their existence, we would not have had an idea of how to connect these three APIs.
+We acknowledge the ZeroMQ community for providing the robust messaging library that forms the foundation of this work, and the MQL5 \& Rust community for the excellent async ecosystem enabling this implementation. If it were not for their existence, we would not have had an idea of how to connect these three APIs.
 
 We thank ourselves for having a goal to contribute to the research community rather than presenting a non-implementable approach or complicated methods; for answering one gap; for staying strong despite the unfamiliar challenges; and for the willingness to explore and grow again after backing down.
 
@@ -624,9 +624,11 @@ We thank ourselves for having a goal to contribute to the research community rat
 \noindent\textbf{Email:} algorembrant@gmail.com
 
 \noindent\textbf{First Version:} January 20, 2026
+
 \noindent\textbf{GitHub:} \url{https://github.com/algorembrant/Rust-ZMQ-MT5}
 
 \noindent\textbf{This Version:} January 27, 2026
+
 \noindent\textbf{GitHub:} \url{https://github.com/algorembrant/SUM3API}
 
 %% ============================================================================
