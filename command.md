@@ -3,11 +3,9 @@ Independent Researcher
 ORCID: https://orcid.org/0009-0006-8743-4419
 Email: algorembrant@gmail.com
 GitHub: https://github.com/algorembrant/SUM3API
+First version: Jan 20, this version Jan 27 2026
 
 
-
-make reusable MQL5 wrapper library for Ze
-roMQ socket operations, put everything related to that inside another md file.
 
 The implementation is done inside a 7-year old Windows 10 Pro 64-bit laptop with 8GB RAM and Intel Core i5-7200U CPU @ 2.50GHz 2.71 GHz, NVIDIA GeForce 940MX, and 256GB SSD
 
@@ -34,6 +32,11 @@ appendix 1, a comment superscript - not a complete library like MQL's python lib
 appendix 1, a comment superscript - the software loses live data if closed, the database only store 'requested' information and not auto hence we cant recover the data if lost connected (unless we toggle ON recording all the time)
 
 appendix 1, a comment superscript - ive been in software development since mid November5, i haven't learned docker yet.
+
+appendix 1, a comment superscript - The first version of this was discovered at January 20, 2026. At the time of writing, it's really hard to find benchmark research papers since no one is interested in binding MT5’s API using a ZMQ bridge to other programming languages such as Rust, Go, C++, and Python (creating a combination of 3). We search across the internet using 9 AI leading platforms, namely Grok, Gemini, Claude, ChatGPT, MSCopilot, Perplexity, Baidu (Ernie Bot), DeepSeek, and Qwen (1, 2, 3, 4, 5, 6, 7, 8, 9). Some of the AI’s responses end up hallucinating, suggesting a combination of 2, and not the strictly 3, but later been clarified and confirmed that there are no public projects yet to implement before this. We also searched across four scholarly libraries, such as Arxiv, Google Scholar, SSRN, and Baidu 学术 (10, 11, 12, 13). The lack of literature suggests that this study’s approach (specifically using MT5’s MQL5 API to fetch live-trading datafeed from its connected Broker) is bound to ZMQ, bringing the other programming languages are not that popular and not well explored. (insert links to 1-13). Detailed ZMQ (The DLLs require that you have the latest Visual C++ runtime (2015).) binding to MQL - https://github.com/dingmaotu/mql-zmq (14) ZMQ binding to Rust - https://github.com/zeromq/zmq.rs (15) ZMQ binding between MQL and JavaScript - https://github.com/EricSchles/bindings-mql4-5 (16). (add year date to that) But never the 3 API combination (MQL5, ZMQ, RUST). 
+
+
+
 
 
 Acknowledgements {
