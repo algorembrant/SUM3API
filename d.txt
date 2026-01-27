@@ -1,5 +1,0 @@
-revies this research paper made of  latex @main.tex  and @references.bib , make another latex files for it, make the {Independent Researcher
-ORCID: https://orcid.org/0009-0006-8743-4419
-Email: algorembrant@gmail.com
-GitHub: https://github.com/algorembrant/SUM3API
-First version: Jan 20, this version Jan 27 2026} into different page and just use superscripts for it.  I have new informations here @command.md , mostly are comments and i want you to apply superscripts navigations for each of that. Make use of everything(contents) in @command.md  to enhance the @main.tex  even if it means to make a large appendixes. Make sure it is also aligned from @MQL5-ZMQ%20Library%20for%20SUM3API.md  and @Rust-ZMQ%20Library%20for%20SUM3API.md. Make sure you've reviewed and tackled everything from @MQL5  and @Rustmt5-chart  system. 
