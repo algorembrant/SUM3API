@@ -46,7 +46,7 @@ This system provides **bidirectional real-time communication** between MetaTrade
 flowchart TB
     subgraph MT5["MetaTrader 5"]
         EA[ZmqPublisher.mq5<br/>Expert Advisor]
-        ZMQ_LIB[libzmq.dll]
+        ZMQ_LIB[libzmq.dll + libsodium.dll]
         WRAPPER[Zmq.mqh<br/>MQL5 Wrapper]
     end
     
