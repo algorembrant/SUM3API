@@ -32,12 +32,25 @@
     captionpos=b
 }
 
-% Hyperref settings
+% Hyperref settings with backref for bidirectional citation navigation
 \hypersetup{
     colorlinks=true,
     linkcolor=blue,
     citecolor=blue,
-    urlcolor=blue
+    urlcolor=blue,
+    pagebackref=true
+}
+
+% Customize backref text to show "Cited on page(s) X"
+\renewcommand*{\backref}[1]{}
+\renewcommand*{\backrefalt}[4]{%
+    \ifcase #1 %
+        (Not cited.)%
+    \or
+        (Cited on page~#2.)%
+    \else
+        (Cited on pages~#2.)%
+    \fi
 }
 
 \def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
@@ -93,7 +106,7 @@ While MQL5 offers comprehensive functionality for developing trading strategies 
 
 \subsection{Problem Statement}
 
-Despite the widespread adoption of MetaTrader 5, there exists a notable gap in publicly documented methodologies for extracting financial data from MT5 and projecting it to external applications in real-time\textsuperscript{\hyperref[sec:a9]{A9}}. Existing approaches typically fall into three categories: (1) native MQL5 development confined within the MT5 environment, (2) Python-based extraction using the official MetaTrader package with inherent performance limitations, and (3) informal, undocumented workarounds that lack reproducibility and standardization. This gap is particularly problematic for quantitative researchers and algorithmic traders who require access to MT5 data feeds within high-performance computing environments, machine learning pipelines, or custom trading terminals developed in systems programming languages.
+Despite the widespread adoption of MetaTrader 5, there exists a notable gap in publicly documented methodologies for extracting financial data from MT5 and projecting it to external applications in real-time\label{ref:a9}\textsuperscript{\hyperref[sec:a9]{A9}}. Existing approaches typically fall into three categories: (1) native MQL5 development confined within the MT5 environment, (2) Python-based extraction using the official MetaTrader package with inherent performance limitations, and (3) informal, undocumented workarounds that lack reproducibility and standardization. This gap is particularly problematic for quantitative researchers and algorithmic traders who require access to MT5 data feeds within high-performance computing environments, machine learning pipelines, or custom trading terminals developed in systems programming languages.
 
 \subsection{Research Questions}
 
@@ -113,7 +126,7 @@ The primary objectives of this research were:
     \item To design and implement a ZeroMQ-based communication bridge between MQL5 and Rust
     \item To develop a reusable MQL5 \& Rust wrapper library for ZeroMQ socket operations
     \item To create a functional Rust-based trading terminal demonstrating real-time data consumption and order execution
-    \item To document the methodology with sufficient detail for reproducibility\textsuperscript{\hyperref[sec:a2]{A2}}
+    \item To document the methodology with sufficient detail for reproducibility\label{ref:a2}\textsuperscript{\hyperref[sec:a2]{A2}}
 \end{enumerate}
 
 \subsection{Significance}
@@ -218,7 +231,7 @@ The Expert Advisor executes on an MT5 chart and performs continuous data extract
     \item \textbf{OnDeinit()}: Graceful shutdown of ZeroMQ sockets and context
 \end{itemize}
 
-All metadata are fetched automatically, independent of the ticker or symbol attached to the Expert Advisor. For this implementation, the EA can be attached to any chart (e.g., XAUUSDc or BTCUSDc) without modifying the code\textsuperscript{\hyperref[sec:a1]{A1}}.
+All metadata are fetched automatically, independent of the ticker or symbol attached to the Expert Advisor. For this implementation, the EA can be attached to any chart (e.g., XAUUSDc or BTCUSDc) without modifying the code\label{ref:a1}\textsuperscript{\hyperref[sec:a1]{A1}}.
 
 \subsection{Rust Application Architecture}
 
@@ -389,7 +402,7 @@ We built the trading interface using egui's immediate-mode paradigm, providing:
     \item Trade execution controls (market, limit, stop orders)
     \item Position and order management with close/cancel functionality
     \item Historical data download interface (OHLC and tick data)
-    \item Live tick recording to CSV\textsuperscript{\hyperref[sec:a7]{A7}}
+    \item Live tick recording to CSV\label{ref:a7}\textsuperscript{\hyperref[sec:a7]{A7}}
     \item Messages and notifications for recent calls
 \end{itemize}
 
@@ -434,7 +447,7 @@ We validated the system through integration testing within a live MT5 environmen
 
 \begin{itemize}
     \item Successful connection establishment between MQL5 and Rust components
-    \item Accurate tick data transmission with no message loss under normal market conditions\textsuperscript{\hyperref[sec:a3]{A3}}
+    \item Accurate tick data transmission with no message loss under normal market conditions\label{ref:a3}\textsuperscript{\hyperref[sec:a3]{A3}}
     \item Correct order execution and response handling
     \item Proper position and order state synchronization
     \item CSV export functionality verification
@@ -534,7 +547,7 @@ Several limitations should be acknowledged:
 
 \begin{enumerate}
     \item \textbf{Platform Dependency}: The MQL5 component requires a running MT5 instance, inheriting MT5's platform constraints.
-    \item \textbf{Single Symbol Scope}: The current implementation operated on the chart symbol where the EA was attached; multi-symbol support would require architecture extensions\textsuperscript{\hyperref[sec:a5]{A5}}.
+    \item \textbf{Single Symbol Scope}: The current implementation operated on the chart symbol where the EA was attached; multi-symbol support would require architecture extensions\label{ref:a5}\textsuperscript{\hyperref[sec:a5]{A5}}.
     \item \textbf{JSON Overhead}: Binary serialization formats (e.g., MessagePack, Protocol Buffers) could reduce serialization latency.
     \item \textbf{Local Communication}: The implementation was optimized for localhost communication; network deployment would require additional security considerations.
     \item \textbf{Error Recovery}: Reconnection logic was basic; production deployments would benefit from enhanced fault tolerance.
@@ -543,7 +556,7 @@ Several limitations should be acknowledged:
 
 \subsection{Practical Applications}
 
-The methodology enabled several practical applications\textsuperscript{\hyperref[sec:a4]{A4}}:
+The methodology enabled several practical applications\label{ref:a4}\textsuperscript{\hyperref[sec:a4]{A4}}:
 
 \begin{itemize}
     \item \textbf{Custom Trading Terminals}: Develop trading interfaces tailored to specific workflows
@@ -567,7 +580,7 @@ This research presented SUM3API, a methodology for establishing bidirectional re
     \item A reusable MQL5 ZeroMQ wrapper class (\texttt{CZmq}) for socket operations
     \item An Expert Advisor design pattern for tick streaming and command processing
     \item A complete Rust application architecture demonstrating async data handling and GUI integration
-    \item Open-source implementation enabling reproducibility and extension\textsuperscript{\hyperref[sec:a6]{A6}}
+    \item Open-source implementation enabling reproducibility and extension\label{ref:a6}\textsuperscript{\hyperref[sec:a6]{A6}}
 \end{enumerate}
 
 The methodology addressed the gap in documented approaches for MT5 data extraction to external high-performance applications, enabling quantitative researchers and algorithmic traders to leverage modern programming tools while maintaining connectivity to MT5's market access infrastructure.
@@ -590,7 +603,7 @@ Future development directions include:
     \item Enhanced fault tolerance with automatic reconnection
     \item Strategy execution framework built on the communication layer
     \item Performance benchmarking with microsecond-precision instrumentation
-    \item Docker containerization for simplified deployment\textsuperscript{\hyperref[sec:a8]{A8}}
+    \item Docker containerization for simplified deployment\label{ref:a8}\textsuperscript{\hyperref[sec:a8]{A8}}
 \end{itemize}
 
 %% ============================================================================
@@ -640,47 +653,47 @@ We thank ourselves for having a goal to contribute to the research community rat
 
 This appendix provides additional context and clarifications referenced throughout the main text via superscript annotations.
 
-\subsection{A1: Trading Account and Broker Information}
+\subsection{\hyperref[ref:a1]{A1}: Trading Account and Broker Information}
 \label{sec:a1}
 
 We used Exness as the broker with a Standard-cent live trading account. Since a cent-based account was used, all tradable assets have a ``c'' suffix (e.g., XAUUSDc for gold, BTCUSDc for Bitcoin, etc.). This implementation used a live account, not a demo or paper trading account.
 
-\subsection{A2: Development Environment Setup}
+\subsection{\hyperref[ref:a2]{A2}: Development Environment Setup}
 \label{sec:a2}
 
 We installed the following applications: Git, Rust (with cargo), Visual Studio C++ Build Tools, MetaTrader 5, and MetaEditor 5. The development was conducted using Google Antigravity (any code editor with terminal access would suffice). The specific versions used are not critical to the implementation.
 
-\subsection{A3: Tick Data Accuracy Note}
+\subsection{\hyperref[ref:a3]{A3}: Tick Data Accuracy Note}
 \label{sec:a3}
 
 The current implementation has not been compared against other bid/ask formation approaches (dataframes, line chart formations). Therefore, we cannot definitively claim no data loss or perfectly successful extraction. The microsecond-resolution raw bid/ask formation uses a non-fixed-time-interval x-axis; the formation depends on raw up-and-down tick movement count. Thus, the statement ``accurate tick data transmission with no message loss'' applied only ``under normal market conditions.''
 
-\subsection{A4: Related Python Project}
+\subsection{\hyperref[ref:a4]{A4}: Related Python Project}
 \label{sec:a4}
 
 We have a dedicated Python project for fetching tradable assets (forex, crypto) from an Exness Standard-cent live account. The project is available at: \url{https://github.com/algorembrant/QRAT2025/blob/main/Python\%20Folder/Ticker\%20Quotes\%20Fetching/Quotes\%20of\%20all\%20tradable\%20assets\%20in\%20Exness.ipynb}
 
-\subsection{A5: Multi-Symbol Support}
+\subsection{\hyperref[ref:a5]{A5}: Multi-Symbol Support}
 \label{sec:a5}
 
 For the ``Single Symbol Scope'' limitation, there is a way to address this---we have implemented it in previous projects where an EA attached to one symbol can trade different symbols. However, this functionality is kept out of this research study for simplicity. The code for multi-symbol support is not publicly available; interested parties may contact us. The reason for keeping it private is that it implements an automated algorithmic trading bot with a diversification model. Documentation for that EA is available at: \url{https://github.com/algorembrant/QRAT2025/blob/main/Research\%20Papers/The\%203HTMOSDSDT.rp2}
 
-\subsection{A6: Library Completeness}
+\subsection{\hyperref[ref:a6]{A6}: Library Completeness}
 \label{sec:a6}
 
 This is not a complete library comparable to MQL's official Python library, but a library that contains all functionality tackled in the SUM3API system, fully documented and operational.
 
-\subsection{A7: Data Persistence Limitation}
+\subsection{\hyperref[ref:a7]{A7}: Data Persistence Limitation}
 \label{sec:a7}
 
 The software loses live data if closed. The database only stores ``requested'' information and does not automatically persist data. Data cannot be recovered if connection is lost unless the user toggles recording ON continuously.
 
-\subsection{A8: Docker Containerization}
+\subsection{\hyperref[ref:a8]{A8}: Docker Containerization}
 \label{sec:a8}
 
 We have been in software development since mid-November 2025 and have not yet learned Docker. Docker containerization is listed as a future work item.
 
-\subsection{A9: Literature Search Methodology}
+\subsection{\hyperref[ref:a9]{A9}: Literature Search Methodology}
 \label{sec:a9}
 
 The first version of this research was discovered on January 20, 2026. At the time of writing, it was challenging to find benchmark research papers since limited interest exists in binding MT5's API using a ZMQ bridge to other programming languages such as Rust, Go, C++, or Java (creating a combination of 3 APIs).
