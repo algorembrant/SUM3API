@@ -22,7 +22,10 @@ A comprehensive reusable MQL5 wrapper library for ZeroMQ socket operations, desi
 
 ## Overview
 
-This library provides a high-level MQL5 wrapper around the native ZeroMQ (libzmq) library, enabling MetaTrader 5 Expert Advisors and indicators to communicate with external applications via TCP sockets. It is modeled after the Python ZeroMQ bindings style from MetaQuotes Corp.
+This library provides a high-level MQL5 wrapper around the native ZeroMQ (libzmq) library, enabling MetaTrader 5 Expert Advisors and indicators to communicate with external applications via TCP sockets.
+
+> [!NOTE]
+> For the companion Rust client library, see [Rust-ZMQ Library for SUM3API](Rust-ZMQ%20Library%20for%20SUM3API.md).
 
 ### Key Features
 
@@ -65,7 +68,7 @@ flowchart LR
     subgraph Client["External Client"]
         SUB["SUB Socket"]
         REQ["REQ Socket"]
-        APP["Application<br/>(Rust/Python/C++)"]
+        APP["Application<br/>(Rust/Go/Java/C++)"]
         SUB --> APP
         REQ --> APP
     end
@@ -433,8 +436,8 @@ void OnDeinit(const int reason) {
 flowchart LR
     PUB["Publisher\n(MT5 EA)"]
     SUB1["Subscriber 1\n(Rust App)"]
-    SUB2["Subscriber 2\n(Python Script)"]
-    SUB3["Subscriber 3\n(Dashboard)"]
+    SUB2["Subscriber 2\n(Go Service)"]
+    SUB3["Subscriber 3\n(Java Dashboard)"]
     
     PUB -->|"Tick JSON"| SUB1
     PUB -->|"Tick JSON"| SUB2
@@ -467,18 +470,27 @@ loop {
 }
 ```
 
-**Python Client Side (Subscriber):**
-```python
-import zmq
+**Go Client Side (Subscriber):**
+```go
+package main
 
-context = zmq.Context()
-socket = context.socket(zmq.SUB)
-socket.connect("tcp://127.0.0.1:5555")
-socket.setsockopt_string(zmq.SUBSCRIBE, "")
+import (
+    "fmt"
+    zmq "github.com/pebbe/zmq4"
+)
 
-while True:
-    message = socket.recv_string()
-    print(f"Received: {message}")
+func main() {
+    subscriber, _ := zmq.NewSocket(zmq.SUB)
+    defer subscriber.Close()
+    
+    subscriber.Connect("tcp://127.0.0.1:5555")
+    subscriber.SetSubscribe("")  // Subscribe to all messages
+    
+    for {
+        msg, _ := subscriber.Recv(0)
+        fmt.Printf("Received: %s\n", msg)
+    }
+}
 ```
 
 ---
@@ -534,22 +546,29 @@ let response = socket.recv().await?;
 println!("Response: {:?}", response);
 ```
 
-**Python Client Side (Requester):**
-```python
-import zmq
-import json
+**Go Client Side (Requester):**
+```go
+package main
 
-context = zmq.Context()
-socket = context.socket(zmq.REQ)
-socket.connect("tcp://127.0.0.1:5556")
+import (
+    "fmt"
+    zmq "github.com/pebbe/zmq4"
+)
 
-# Send order
-order = {"type": "market_buy", "symbol": "EURUSD", "volume": 0.01}
-socket.send_json(order)
-
-# Receive response
-response = socket.recv_json()
-print(f"Response: {response}")
+func main() {
+    requester, _ := zmq.NewSocket(zmq.REQ)
+    defer requester.Close()
+    
+    requester.Connect("tcp://127.0.0.1:5556")
+    
+    // Send order request
+    request := `{"type":"market_buy","symbol":"EURUSD","volume":0.01}`
+    requester.Send(request, 0)
+    
+    // Wait for response
+    response, _ := requester.Recv(0)
+    fmt.Printf("Response: %s\n", response)
+}
 ```
 
 ---
@@ -861,101 +880,182 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-### Example 4: Python Client (Complete)
+### Example 4: Java Client (Complete)
 
-```python
-#!/usr/bin/env python3
-"""
-MT5 ZeroMQ Client Example
-"""
-import zmq
-import json
-import threading
-import time
+```java
+// Maven dependency: org.zeromq:jeromq:0.5.3
+import org.zeromq.SocketType;
+import org.zeromq.ZContext;
+import org.zeromq.ZMQ;
+import com.google.gson.Gson;
 
-class MT5Client:
-    def __init__(self, tick_port=5555, order_port=5556):
-        self.context = zmq.Context()
-        
-        # Subscriber for tick data
-        self.tick_socket = self.context.socket(zmq.SUB)
-        self.tick_socket.connect(f"tcp://127.0.0.1:{tick_port}")
-        self.tick_socket.setsockopt_string(zmq.SUBSCRIBE, "")
-        
-        # Requester for orders
-        self.order_socket = self.context.socket(zmq.REQ)
-        self.order_socket.connect(f"tcp://127.0.0.1:{order_port}")
-        
-        self.running = False
+public class MT5Client {
+    private ZContext context;
+    private ZMQ.Socket subscriber;
+    private ZMQ.Socket requester;
+    private Gson gson = new Gson();
     
-    def start_tick_stream(self, callback):
-        """Start receiving tick data in background thread."""
-        self.running = True
+    public MT5Client(int tickPort, int orderPort) {
+        context = new ZContext();
         
-        def receiver():
-            while self.running:
-                try:
-                    msg = self.tick_socket.recv_string(zmq.NOBLOCK)
-                    tick = json.loads(msg)
-                    callback(tick)
-                except zmq.Again:
-                    time.sleep(0.001)
-                except Exception as e:
-                    print(f"Tick error: {e}")
+        // Subscriber for tick data
+        subscriber = context.createSocket(SocketType.SUB);
+        subscriber.connect("tcp://127.0.0.1:" + tickPort);
+        subscriber.subscribe("".getBytes());
         
-        thread = threading.Thread(target=receiver, daemon=True)
-        thread.start()
-        return thread
+        // Requester for orders
+        requester = context.createSocket(SocketType.REQ);
+        requester.connect("tcp://127.0.0.1:" + orderPort);
+    }
     
-    def send_order(self, order_type, symbol, volume, price=0, ticket=0):
-        """Send an order request and wait for response."""
-        request = {
-            "type": order_type,
-            "symbol": symbol,
-            "volume": volume,
-            "price": price,
-            "ticket": ticket
-        }
+    public void startTickStream() {
+        new Thread(() -> {
+            while (!Thread.currentThread().isInterrupted()) {
+                String msg = subscriber.recvStr(ZMQ.DONTWAIT);
+                if (msg != null) {
+                    TickData tick = gson.fromJson(msg, TickData.class);
+                    System.out.printf("%s: Bid=%.5f, Ask=%.5f%n", 
+                        tick.symbol, tick.bid, tick.ask);
+                }
+                try { Thread.sleep(1); } catch (InterruptedException e) { break; }
+            }
+        }).start();
+    }
+    
+    public OrderResponse sendOrder(String type, String symbol, double volume) {
+        OrderRequest request = new OrderRequest(type, symbol, volume);
+        requester.send(gson.toJson(request));
+        String response = requester.recvStr();
+        return gson.fromJson(response, OrderResponse.class);
+    }
+    
+    public void close() {
+        context.close();
+    }
+    
+    // Data classes
+    static class TickData {
+        String symbol;
+        double bid, ask;
+        long time;
+    }
+    
+    static class OrderRequest {
+        String type, symbol;
+        double volume;
+        OrderRequest(String t, String s, double v) { type=t; symbol=s; volume=v; }
+    }
+    
+    static class OrderResponse {
+        boolean success;
+        Long ticket;
+        String error;
+    }
+    
+    public static void main(String[] args) {
+        MT5Client client = new MT5Client(5555, 5556);
+        client.startTickStream();
         
-        self.order_socket.send_json(request)
-        response = self.order_socket.recv_json()
-        return response
-    
-    def market_buy(self, symbol, volume):
-        return self.send_order("market_buy", symbol, volume)
-    
-    def market_sell(self, symbol, volume):
-        return self.send_order("market_sell", symbol, volume)
-    
-    def close_position(self, ticket):
-        return self.send_order("close_position", "", 0, 0, ticket)
-    
-    def stop(self):
-        self.running = False
-        self.tick_socket.close()
-        self.order_socket.close()
-        self.context.term()
+        // Execute a buy order
+        OrderResponse response = client.sendOrder("market_buy", "EURUSD", 0.01);
+        System.out.println("Order result: " + response.success);
+    }
+}
+```
 
+### Example 5: C++ Client (Complete)
 
-# Usage Example
-if __name__ == "__main__":
-    client = MT5Client()
+```cpp
+// Requires: libzmq, cppzmq, nlohmann/json
+// Compile: g++ -std=c++17 -o mt5_client mt5_client.cpp -lzmq -lpthread
+
+#include <zmq.hpp>
+#include <nlohmann/json.hpp>
+#include <iostream>
+#include <thread>
+#include <atomic>
+
+using json = nlohmann::json;
+
+class MT5Client {
+private:
+    zmq::context_t context;
+    zmq::socket_t subscriber;
+    zmq::socket_t requester;
+    std::atomic<bool> running{false};
+    std::thread tick_thread;
+
+public:
+    MT5Client(int tick_port = 5555, int order_port = 5556)
+        : context(1), subscriber(context, zmq::socket_type::sub),
+          requester(context, zmq::socket_type::req) {
+        
+        subscriber.connect("tcp://127.0.0.1:" + std::to_string(tick_port));
+        subscriber.set(zmq::sockopt::subscribe, "");
+        
+        requester.connect("tcp://127.0.0.1:" + std::to_string(order_port));
+    }
     
-    def on_tick(tick):
-        print(f"{tick['symbol']}: {tick['bid']}/{tick['ask']}")
+    void start_tick_stream() {
+        running = true;
+        tick_thread = std::thread([this]() {
+            while (running) {
+                zmq::message_t message;
+                auto result = subscriber.recv(message, zmq::recv_flags::dontwait);
+                if (result) {
+                    std::string msg(static_cast<char*>(message.data()), message.size());
+                    json tick = json::parse(msg);
+                    std::cout << tick["symbol"].get<std::string>() 
+                              << ": Bid=" << tick["bid"].get<double>()
+                              << ", Ask=" << tick["ask"].get<double>() << std::endl;
+                }
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            }
+        });
+    }
     
-    client.start_tick_stream(on_tick)
+    json send_order(const std::string& type, const std::string& symbol, double volume) {
+        json request = {{"type", type}, {"symbol", symbol}, {"volume", volume}};
+        std::string req_str = request.dump();
+        
+        zmq::message_t req_msg(req_str.begin(), req_str.end());
+        requester.send(req_msg, zmq::send_flags::none);
+        
+        zmq::message_t reply;
+        requester.recv(reply);
+        
+        std::string reply_str(static_cast<char*>(reply.data()), reply.size());
+        return json::parse(reply_str);
+    }
     
-    # Execute a buy order
-    response = client.market_buy("EURUSD", 0.01)
-    print(f"Order result: {response}")
+    json market_buy(const std::string& symbol, double volume) {
+        return send_order("market_buy", symbol, volume);
+    }
     
-    # Keep running
-    try:
-        while True:
-            time.sleep(1)
-    except KeyboardInterrupt:
-        client.stop()
+    json market_sell(const std::string& symbol, double volume) {
+        return send_order("market_sell", symbol, volume);
+    }
+    
+    void stop() {
+        running = false;
+        if (tick_thread.joinable()) tick_thread.join();
+    }
+    
+    ~MT5Client() { stop(); }
+};
+
+int main() {
+    MT5Client client;
+    client.start_tick_stream();
+    
+    // Execute a buy order
+    json response = client.market_buy("EURUSD", 0.01);
+    std::cout << "Order result: " << response.dump() << std::endl;
+    
+    // Keep running
+    std::this_thread::sleep_for(std::chrono::seconds(60));
+    return 0;
+}
 ```
 
 ---
