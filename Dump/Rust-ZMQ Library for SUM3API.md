@@ -862,33 +862,13 @@ All clients use the same JSON message protocol defined in the [MQL5-ZMQ Library]
 | Version | Date | Changes |
 |---------|------|---------|
 | 2.00 | 2026-01-27 | Added order handling, position tracking, full async support |
-| 1.00 | 2026-01-20 | Initial release with tick subscription |
+| 1.00 | 2024-01-01 | Initial release with tick subscription |
 
 ---
 
 ## License
 
-MIT License
-
-Copyright (c) 2026 Albeos Rembrant
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+Copyright 2026, Algorembrant. All rights reserved.
 
 ---
 
@@ -898,21 +878,4 @@ SOFTWARE.
 - [Tokio Async Runtime](https://tokio.rs/)
 - [Serde JSON](https://serde.rs/)
 - [MQL5-ZMQ Library](MQL5-ZMQ%20Library%20for%20SUM3API.md)
-- [GitHub Repository](https://github.com/algorembrant/Rust-ZMQ-MT5)
-
----
-
-## Citation
-
-If you use this library in your research or project, please cite:
-
-```bibtex
-@software{rembrant2026sum3api,
-  author       = {Rembrant, Albeos},
-  title        = {{SUM3API}: Using Rust, ZeroMQ, and MetaQuotes Language (MQL5) API Combination to Extract, Communicate, and Externally Project Financial Data from MetaTrader 5 (MT5)},
-  year         = {2026},
-  publisher    = {GitHub},
-  url          = {https://github.com/algorembrant/Rust-ZMQ-MT5},
-  version      = {2.00}
-}
-```
+- [GitHub Repository](https://github.com/algorembrant/SUM3API)
