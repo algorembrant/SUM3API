@@ -151,7 +151,7 @@ ZeroMQ (ØMQ) is a high-performance asynchronous messaging library designed for 
 
 ZeroMQ has been adopted in financial technology applications due to its low-latency characteristics, language-agnostic design, and support for various transport protocols including TCP and inter-process communication (IPC) \cite{arndt2019}. Prior work has demonstrated ZeroMQ integration with trading platforms, notably in the context of MT4 and Python bridges \cite{darwinex2020}, though comprehensive documentation for MT5 integration with systems programming languages remained sparse.
 
-Existing ZeroMQ bindings include the dingmaotu/mql-zmq project for MQL integration \cite{mqlzmq2020}, zeromq/zmq.rs for Rust bindings \cite{zmqrs2024}, and EricSchles/bindings-mql4-5 for JavaScript integration \cite{zmqmqljs2019}. However, no prior public project had combined all three: MQL5, ZeroMQ, and Rust in a unified API bridge\textsuperscript{\hyperref[sec:a9]{A9}}.
+Existing ZeroMQ bindings include the dingmaotu/mql-zmq project for MQL integration \cite{mqlzmq2020}, zeromq/zmq.rs for Rust bindings \cite{zmqrs2024}, and EricSchles/bindings-mql4-5 for JavaScript integration \cite{zmqmqljs2019}. However, no prior public project had combined all three: MQL5, ZeroMQ, and Rust in a unified API bridge.
 
 \subsection{Rust for Systems Programming}
 
@@ -182,7 +182,7 @@ We conducted the implementation on a 7-year old Windows 10 Pro 64-bit laptop wit
     \item \textbf{Storage}: 256GB SSD
 \end{itemize}
 
-The development toolchain included Git, Rust (with cargo), Visual Studio C++ Build Tools, MetaTrader 5, and MetaEditor 5\textsuperscript{\hyperref[sec:a2]{A2}}. We developed the code using Google Antigravity as the primary editor.
+The development toolchain included Git, Rust (with cargo), Visual Studio C++ Build Tools, MetaTrader 5, and MetaEditor 5. We developed the code using Google Antigravity as the primary editor.
 
 \subsection{System Architecture}
 
@@ -219,7 +219,7 @@ public:
 };
 \end{lstlisting}
 
-The wrapper imports functions from \texttt{libzmq.dll} using MQL5's native DLL import mechanism, exposing context creation (\texttt{zmq\_ctx\_new}), socket operations (\texttt{zmq\_socket}, \texttt{zmq\_bind}, \texttt{zmq\_connect}), and message transmission (\texttt{zmq\_send}, \texttt{zmq\_recv}). The DLLs require the latest Visual C++ runtime (2015)\textsuperscript{\hyperref[sec:a9]{A9}}.
+The wrapper imports functions from \texttt{libzmq.dll} using MQL5's native DLL import mechanism, exposing context creation (\texttt{zmq\_ctx\_new}), socket operations (\texttt{zmq\_socket}, \texttt{zmq\_bind}, \texttt{zmq\_connect}), and message transmission (\texttt{zmq\_send}, \texttt{zmq\_recv}). The DLLs require the latest Visual C++ runtime (2015).
 
 \subsubsection{Expert Advisor (ZmqPublisher.mq5)}
 
@@ -424,7 +424,7 @@ Trade Execution & Market buy/sell, limit orders, stop orders with configurable l
 Position Management & View active positions with real-time P\&L; close positions \\
 Order Management & View pending limit/stop orders; cancel orders \\
 Historical Data & Download OHLC bars or raw tick data as CSV files \\
-Live Recording & Record incoming tick stream to timestamped CSV files\textsuperscript{\hyperref[sec:a7]{A7}} \\
+Live Recording & Record incoming tick stream to timestamped CSV files \\
 Chart Visualization & Bid/ask lines, position price levels, order execution markers \\
 Messages & Notifications for debugging and recent calls \\
 \bottomrule
@@ -443,7 +443,7 @@ The validation methodology focused on demonstrating functional correctness and c
 
 \subsubsection{Functional Validation}
 
-We validated the system through integration testing within a live MT5 environment connected to an Exness broker Standard-cent live trading account\textsuperscript{\hyperref[sec:a1]{A1}}. Validation criteria included:
+We validated the system through integration testing within a live MT5 environment connected to an Exness broker Standard-cent live trading account. Validation criteria included:
 
 \begin{itemize}
     \item Successful connection establishment between MQL5 and Rust components
@@ -551,7 +551,7 @@ Several limitations should be acknowledged:
     \item \textbf{JSON Overhead}: Binary serialization formats (e.g., MessagePack, Protocol Buffers) could reduce serialization latency.
     \item \textbf{Local Communication}: The implementation was optimized for localhost communication; network deployment would require additional security considerations.
     \item \textbf{Error Recovery}: Reconnection logic was basic; production deployments would benefit from enhanced fault tolerance.
-    \item \textbf{Data Persistence}: The software loses live data if closed; the database only stores ``requested'' information and not automatically---data cannot be recovered if connection is lost unless recording is manually toggled on\textsuperscript{\hyperref[sec:a7]{A7}}.
+    \item \textbf{Data Persistence}: The software loses live data if closed; the database only stores ``requested'' information and not automatically---data cannot be recovered if connection is lost unless recording is manually toggled on.
 \end{enumerate}
 
 \subsection{Practical Applications}
@@ -598,12 +598,12 @@ All source code, raw \& final documentation, video demonstrations, and examples 
 Future development directions include:
 
 \begin{itemize}
-    \item Multi-symbol support through symbol-keyed message routing\textsuperscript{\hyperref[sec:a5]{A5}}
+    \item Multi-symbol support through symbol-keyed message routing
     \item Binary serialization for reduced latency
     \item Enhanced fault tolerance with automatic reconnection
     \item Strategy execution framework built on the communication layer
     \item Performance benchmarking with microsecond-precision instrumentation
-    \item Docker containerization for simplified deployment\label{ref:a8}\textsuperscript{\hyperref[sec:a8]{A8}}
+    \item Docker containerization for simplified deployment\label{ref:a8}
 \end{itemize}
 
 %% ============================================================================
