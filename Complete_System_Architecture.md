@@ -54,6 +54,7 @@ flowchart TB
         end
         
         subgraph DATA_SOURCES["MT5 Data Sources"]
+            direction TB
             MARKET[("Market Data Feed<br/>Tick Stream")]
             ACCOUNT_DB[("Account Database<br/>ACCOUNT_BALANCE<br/>ACCOUNT_EQUITY<br/>ACCOUNT_MARGIN<br/>ACCOUNT_MARGIN_FREE")]
             POSITIONS_DB[("Positions Database<br/>Active Trades")]
@@ -79,7 +80,7 @@ flowchart TB
     end
     
     subgraph ZMQ_LAYER["ZeroMQ Transport Layer (localhost)"]
-        direction LR
+        direction TB
         PUB_SOCKET[["[PUB] PUB Socket<br/>tcp://0.0.0.0:5555<br/>Broadcast Mode"]]
         REP_SOCKET[["[REP] REP Socket<br/>tcp://0.0.0.0:5556<br/>Request-Reply Mode"]]
     end
@@ -93,6 +94,7 @@ flowchart TB
         end
         
         subgraph CHANNELS["MPSC Channels"]
+            direction TB
             TICK_CHAN[Tick Channel<br/>capacity: 100]
             ORDER_CHAN[Order Request Channel<br/>capacity: 10]
             RESPONSE_CHAN[Order Response Channel<br/>capacity: 10]
@@ -103,6 +105,7 @@ flowchart TB
         end
         
         subgraph GUI["egui GUI Components"]
+            direction TB
             CHART[["[Chart] Price Chart<br/>Bid/Ask Lines<br/>Position Lines<br/>Order Breaklines"]]
             ACCOUNT_PANEL[["[Account] Account Info Panel<br/>Balance, Equity<br/>Margin, Free Margin"]]
             TRADE_PANEL[["[Trade] Trade Controls<br/>Market Orders<br/>Pending Orders"]]
