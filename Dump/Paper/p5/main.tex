@@ -126,7 +126,7 @@ The primary objectives of this research were:
 
 \begin{enumerate}
     \item To design and implement a ZeroMQ-based communication bridge between MQL5 and Rust
-    \item To develop a reusable MQL5 \& Rust wrapper library for ZeroMQ socket operations
+    \item To develop a reusable MQL5 \& Rust wrapper library for ZeroMQ socket operations\label{ref:a6}\textsuperscript{\hyperref[sec:a6]{A6}}
     \item To create a functional Rust-based trading terminal demonstrating real-time data consumption and order execution
     \item To document the methodology with sufficient detail for reproducibility\label{ref:a2}\textsuperscript{\hyperref[sec:a2]{A2}}
 \end{enumerate}
@@ -549,7 +549,7 @@ Several limitations should be acknowledged:
 
 \begin{enumerate}
     \item \textbf{Platform Dependency}: The MQL5 component requires a running MT5 instance, inheriting MT5's platform constraints.
-    \item \textbf{Single Symbol Scope}: The current implementation operated on the chart symbol where the EA was attached; multi-symbol support would require architecture extensions\label{ref:a5}\textsuperscript{\hyperref[sec:a5]{A5}} \cite{qrat2025_multisymbol_ea}.
+    \item \textbf{Single Symbol Scope}: The current implementation operated on the chart symbol where the EA was attached; multi-symbol support would require architecture extensions\label{ref:a5}\textsuperscript{\hyperref[sec:a5]{A5}}.
     \item \textbf{JSON Overhead}: Binary serialization formats (e.g., MessagePack, Protocol Buffers) could reduce serialization latency.
     \item \textbf{Local Communication}: The implementation was optimized for localhost communication; network deployment would require additional security considerations.
     \item \textbf{Error Recovery}: Reconnection logic was basic; production deployments would benefit from enhanced fault tolerance.
@@ -582,7 +582,7 @@ This research presented SUM3API, a methodology for establishing bidirectional re
     \item A reusable MQL5 ZeroMQ wrapper class (\texttt{CZmq}) for socket operations
     \item An Expert Advisor design pattern for tick streaming and command processing
     \item A complete Rust application architecture demonstrating async data handling and GUI integration
-    \item Open-source implementation enabling reproducibility and extension\label{ref:a6}\textsuperscript{\hyperref[sec:a6]{A6}}
+    \item Open-source implementation enabling reproducibility and extension
 \end{enumerate}
 
 The methodology addressed the gap in documented approaches for MT5 data extraction to external high-performance applications, enabling quantitative researchers and algorithmic traders to leverage modern programming tools while maintaining connectivity to MT5's market access infrastructure.
@@ -605,7 +605,7 @@ Future development directions include:
     \item Enhanced fault tolerance with automatic reconnection
     \item Strategy execution framework built on the communication layer
     \item Performance benchmarking with microsecond-precision instrumentation
-    \item Docker containerization for simplified deployment\label{ref:a8}
+    \item Docker containerization for simplified deployment\label{ref:a8}\textsuperscript{\hyperref[sec:a8]{A8}}
 \end{itemize}
 
 %% ============================================================================
@@ -723,7 +723,7 @@ This architectural design provides several security advantages:
 \begin{itemize}
     \item \textbf{No Credential Exposure}: Account credentials never leave the MT5 environment and are not transmitted over ZeroMQ sockets
     \item \textbf{Reduced Attack Surface}: External applications cannot directly authenticate to trading accounts; they can only communicate with an already-authenticated MT5 instance
-    \item \textbf{Separation of Concerns}: Authentication is handled by MT5's native security mechanisms, while the external application focuses solely on data consumption and command issuance
+    \item \textbf{Separation of Concerns}: Authentication is handled by MT5's native security mechanisms \cite{mt5_security}, while the external application focuses solely on data consumption and command issuance
     \item \textbf{Localhost Communication}: The default configuration uses localhost TCP sockets, preventing network-based credential interception
 \end{itemize}
 

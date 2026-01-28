@@ -1,7 +1,6 @@
 %% SUM3API Research Paper
 %% Author: Albeos Rembrant
 %% LaTeX Document - IEEE Conference Format
-%% Revised Version with Appendix and Author Page
 
 \documentclass[conference]{IEEEtran}
 \IEEEoverridecommandlockouts
@@ -14,14 +13,11 @@
 \usepackage{textcomp}
 \usepackage{xcolor}
 \usepackage{listings}
-\usepackage[backref]{hyperref}
+\usepackage{hyperref}
 \usepackage{booktabs}
 \usepackage{multirow}
 \usepackage{array}
 \usepackage{float}
-\usepackage{url}
-
-
 
 % Code listing settings
 \lstset{
@@ -34,25 +30,12 @@
     captionpos=b
 }
 
-% Hyperref settings with backref for bidirectional citation navigation
+% Hyperref settingsA
 \hypersetup{
     colorlinks=true,
     linkcolor=blue,
     citecolor=blue,
-    urlcolor=blue,
-    pagebackref=true
-}
-
-% Customize backref text to show "Cited on page(s) X"
-\renewcommand*{\backref}[1]{}
-\renewcommand*{\backrefalt}[4]{%
-    \ifcase #1 %
-        (Not cited.)%
-    \or
-        (Cited on page~#2.)%
-    \else
-        (Cited on pages~#2.)%
-    \fi
+    urlcolor=blue
 }
 
 \def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
@@ -63,15 +46,13 @@
 \title{SUM3API: Using Rust, ZeroMQ, and MetaQuotes Language (MQL5) API Combination to Extract, Communicate, and Externally Project Financial Data from MetaTrader 5 (MT5)}
 
 \author{
-    \IEEEauthorblockN{
-        Rembrant Oyangoren Albeos~%
-        \href{https://orcid.org/0009-0006-8743-4419}{%
-            \includegraphics[height=9pt]{ORCID_icon.png}%
-        }%
-        \textsuperscript{\hyperref[sec:author_info]{$\dagger$}}
+    \IEEEauthorblockN{Rembrant Oyangoren Albeos}
+    \IEEEauthorblockA{
+        \textit{Independent Researcher} \\
+        Email: algorembrant@gmail.com \\
+        GitHub: https://github.com/algorembrant/SUM3API
     }
 }
-
 
 \maketitle
 
@@ -87,11 +68,11 @@
 \end{figure}
 
 \begin{abstract}
-MetaTrader 5 (MT5), when connected to preferred exchanges or brokers, supports automated algorithmic trading via Expert Advisors (EAs) written in MetaQuotes Language (MQL5). While MetaQuotes Ltd. provides an official Python integration package, publicly documented methods for internally extracting and externally projecting MT5 financial data remain limited. To address this gap, we implemented a novel approach that bridges MQL5 and Rust via ZeroMQ publisher--subscriber and request--reply bindings. This benchmark-based methodology enables quantitative researchers, feature engineers, and algorithmic traders to develop trading systems leveraging MT5 data feeds using Rust, thereby bypassing the limitations inherent to pure MQL5 Expert Advisors. The methodology was validated through integration within a functional trading terminal application demonstrating low-latency capabilities including: real-time account information monitoring (balance, equity, free and used margin), downloadable historical data requests (OHLC bars and raw tick data), downloadable forward data streaming (live tick recording), trade execution controls (market, limit, and stop orders with lot sizing and cancellation), messaging and notifications for debugging \& recent calls, and a live microsecond-resolution raw tick-level bid/ask price formation chart. All resources are open-source and available on GitHub: \url{https://github.com/algorembrant/SUM3API}.
+MetaTrader 5 (MT5), when connected to preferred exchanges or brokers, supports automated algorithmic trading via Expert Advisors (EAs) written in MetaQuotes Language (MQL5). While MetaQuotes LLC provides an official Python integration package, publicly documented methods for internally extracting and externally projecting MT5 financial data remain limited. To address this gap, this study implements a novel approach that bridges MQL5 and Rust via ZeroMQ publisher--subscriber and request--reply bindings. This benchmark-based methodology enables quantitative researchers, feature engineers, and algorithmic traders to develop trading systems leveraging MT5 data feeds using Rust, thereby bypassing the limitations inherent to pure MQL5 Expert Advisors. The methodology is validated through integration within a functional trading terminal application demonstrating low-latency capabilities including: real-time account information monitoring (balance, equity, free and used margin), historical data requests (OHLC bars and raw tick data), forward data streaming (live tick recording), trade execution controls (market, limit, and stop orders with lot sizing and cancellation), messaging and notifications for debugging, and a live microsecond-resolution raw tick-level bid/ask price formation chart. All resources are open-source and available on GitHub, enabling reproducibility and community contribution to the advancement of financial data extraction methodologies.
 \end{abstract}
 
 \begin{IEEEkeywords}
-MetaTrader 5, ZeroMQ, Rust, MetaQuotes Language 5, algorithmic trading, inter-process communication, financial data extraction, low-latency systems
+MetaTrader 5, ZeroMQ, Rust, MQL5, algorithmic trading, inter-process communication, financial data extraction, low-latency systems
 \end{IEEEkeywords}
 
 %% ============================================================================
@@ -108,11 +89,11 @@ While MQL5 offers comprehensive functionality for developing trading strategies 
 
 \subsection{Problem Statement}
 
-Despite the widespread adoption of MetaTrader 5, there exists a notable gap in publicly documented methodologies for extracting financial data from MT5 and projecting it to external applications in real-time\label{ref:a9}\textsuperscript{\hyperref[sec:a9]{A9}}. Existing approaches typically fall into three categories: (1) native MQL5 development confined within the MT5 environment, (2) Python-based extraction using the official MetaTrader package with inherent performance limitations, and (3) informal, undocumented workarounds that lack reproducibility and standardization. This gap is particularly problematic for quantitative researchers and algorithmic traders who require access to MT5 data feeds within high-performance computing environments, machine learning pipelines, or custom trading terminals developed in systems programming languages.
+Despite the widespread adoption of MetaTrader 5, there exists a notable gap in publicly documented methodologies for extracting financial data from MT5 and projecting it to external applications in real-time. Existing approaches typically fall into three categories: (1) native MQL5 development confined within the MT5 environment, (2) Python-based extraction using the official MetaTrader package with inherent performance limitations, and (3) informal, undocumented workarounds that lack reproducibility and standardization. This gap is particularly problematic for quantitative researchers and algorithmic traders who require access to MT5 data feeds within high-performance computing environments, machine learning pipelines, or custom trading terminals developed in systems programming languages.
 
 \subsection{Research Questions}
 
-This study addressed the following research questions:
+This study addresses the following research questions:
 
 \begin{enumerate}
     \item How can bidirectional real-time communication be established between MetaTrader 5 and external applications developed in Rust?
@@ -122,13 +103,13 @@ This study addressed the following research questions:
 
 \subsection{Objectives}
 
-The primary objectives of this research were:
+The primary objectives of this research are:
 
 \begin{enumerate}
     \item To design and implement a ZeroMQ-based communication bridge between MQL5 and Rust
-    \item To develop a reusable MQL5 \& Rust wrapper library for ZeroMQ socket operations\label{ref:a6}\textsuperscript{\hyperref[sec:a6]{A6}}
+    \item To develop a reusable MQL5 wrapper library for ZeroMQ socket operations
     \item To create a functional Rust-based trading terminal demonstrating real-time data consumption and order execution
-    \item To document the methodology with sufficient detail for reproducibility\label{ref:a2}\textsuperscript{\hyperref[sec:a2]{A2}}
+    \item To document the methodology with sufficient detail for reproducibility
 \end{enumerate}
 
 \subsection{Significance}
@@ -151,9 +132,7 @@ The official MetaTrader 5 Python package, introduced by MetaQuotes, enables Pyth
 
 ZeroMQ (ØMQ) is a high-performance asynchronous messaging library designed for building scalable distributed systems \cite{hintjens2013}. Unlike traditional message brokers, ZeroMQ operates as a lightweight embedded messaging layer without requiring centralized infrastructure. The library provides multiple messaging patterns including publish--subscribe (PUB/SUB) for one-to-many data distribution and request--reply (REQ/REP) for synchronous communication \cite{hintjens2013}.
 
-ZeroMQ has been adopted in financial technology applications due to its low-latency characteristics, language-agnostic design, and support for various transport protocols including TCP and inter-process communication (IPC) \cite{arndt2019}. Prior work has demonstrated ZeroMQ integration with trading platforms, notably in the context of MT4 and Python bridges \cite{darwinex2020}, though comprehensive documentation for MT5 integration with systems programming languages remained sparse.
-
-Existing ZeroMQ bindings include the dingmaotu/mql-zmq project for MQL integration \cite{mqlzmq2020}, zeromq/zmq.rs for Rust bindings \cite{zmqrs2024}, and EricSchles/bindings-mql4-5 for JavaScript integration \cite{zmqmqljs2019}. However, no prior public project had combined all three: MQL5, ZeroMQ, and Rust in a unified API bridge.
+ZeroMQ has been adopted in financial technology applications due to its low-latency characteristics, language-agnostic design, and support for various transport protocols including TCP and inter-process communication (IPC) \cite{arndt2019}. Prior work has demonstrated ZeroMQ integration with trading platforms, notably in the context of MT4 and Python bridges, though comprehensive documentation for MT5 integration with systems programming languages remains sparse \cite{darwinex2020}.
 
 \subsection{Rust for Systems Programming}
 
@@ -172,19 +151,6 @@ ZeroMQ's socket abstraction provides a middle ground, offering lower latency tha
 %% ============================================================================
 
 \section{Methodology}
-
-\subsection{Development Environment}
-
-We conducted the implementation on a 7-year old Windows 10 Pro 64-bit laptop with the following specifications:
-
-\begin{itemize}
-    \item \textbf{Processor}: Intel Core i5-7200U CPU @ 2.50GHz 2.71 GHz
-    \item \textbf{Memory}: 8GB RAM
-    \item \textbf{Graphics}: NVIDIA GeForce 940MX
-    \item \textbf{Storage}: 256GB SSD
-\end{itemize}
-
-The development toolchain included Git, Rust (with cargo), Visual Studio C++ Build Tools, MetaTrader 5, and MetaEditor 5. We developed the code using Google Antigravity as the primary editor.
 
 \subsection{System Architecture}
 
@@ -221,7 +187,7 @@ public:
 };
 \end{lstlisting}
 
-The wrapper imports functions from \texttt{libzmq.dll} using MQL5's native DLL import mechanism, exposing context creation (\texttt{zmq\_ctx\_new}), socket operations (\texttt{zmq\_socket}, \texttt{zmq\_bind}, \texttt{zmq\_connect}), and message transmission (\texttt{zmq\_send}, \texttt{zmq\_recv}). The DLLs require the latest Visual C++ runtime (2015).
+The wrapper imports functions from \texttt{libzmq.dll} using MQL5's native DLL import mechanism, exposing context creation (\texttt{zmq\_ctx\_new}), socket operations (\texttt{zmq\_socket}, \texttt{zmq\_bind}, \texttt{zmq\_connect}), and message transmission (\texttt{zmq\_send}, \texttt{zmq\_recv}).
 
 \subsubsection{Expert Advisor (ZmqPublisher.mq5)}
 
@@ -232,8 +198,6 @@ The Expert Advisor executes on an MT5 chart and performs continuous data extract
     \item \textbf{OnTick()}: On each market tick, gathers current bid/ask prices, account state, open positions, and pending orders; serializes data to JSON; publishes to PUB socket; non-blocking check for incoming REQ messages
     \item \textbf{OnDeinit()}: Graceful shutdown of ZeroMQ sockets and context
 \end{itemize}
-
-All metadata are fetched automatically, independent of the ticker or symbol attached to the Expert Advisor. For this implementation, the EA can be attached to any chart (e.g., XAUUSDc or BTCUSDc) without modifying the code\label{ref:a1}\textsuperscript{\hyperref[sec:a1]{A1}}\label{ref:a4}\textsuperscript{\hyperref[sec:a4]{A4}} \cite{qrat2025_tradable_assets}.
 
 \subsection{Rust Application Architecture}
 
@@ -282,11 +246,11 @@ The main application thread runs an \texttt{egui}-based graphical interface, con
 
 \subsection{Data Serialization}
 
-All inter-process communication employed JSON serialization for message payloads. While JSON introduces serialization overhead compared to binary formats, it provides debugging transparency and simplifies cross-language compatibility. The tick data message structure includes the following example:
+All inter-process communication employs JSON serialization for message payloads. While JSON introduces serialization overhead compared to binary formats, it provides debugging transparency and simplifies cross-language compatibility. The tick data message structure includes:
 
 \begin{lstlisting}[caption=Tick Data JSON Structure]
 {
-    "symbol": "XAUUSD",    
+    "symbol": "XAUUSD",
     "bid": 2650.55,
     "ask": 2650.75,
     "time": 1706284800,
@@ -311,11 +275,11 @@ All inter-process communication employed JSON serialization for message payloads
 
 \subsection{MQL5 Implementation Details}
 
-The MQL5 implementation totaled approximately 600 lines of code across four files: the \texttt{Zmq.mqh} wrapper (144 lines), the \texttt{ZmqPublisher.mq5} Expert Advisor (451 lines), and the \texttt{libsodium.dll \& libzmq.dll} DLL files.
+The MQL5 implementation totals approximately 600 lines of code across two files: the \texttt{Zmq.mqh} wrapper (144 lines) and the \texttt{ZmqPublisher.mq5} Expert Advisor.
 
 \subsubsection{ZeroMQ Library Integration}
 
-We integrated the native ZeroMQ library (\texttt{libzmq.dll}) through MQL5's \texttt{\#import} directive, which enables calling external DLL functions. The wrapper handles 64-bit pointer compatibility by using \texttt{long} type for context and socket handles:
+The native ZeroMQ library (\texttt{libzmq.dll}) is integrated through MQL5's \texttt{\#import} directive, which enables calling external DLL functions. The wrapper handles 64-bit pointer compatibility by using \texttt{long} type for context and socket handles:
 
 \begin{lstlisting}[language=C++, caption=DLL Import Declarations]
 #import "libzmq.dll"
@@ -337,11 +301,11 @@ The \texttt{OnTick()} handler constructs a comprehensive JSON message on each ma
 
 \subsubsection{Order Processing}
 
-Incoming order requests were processed via non-blocking receive on the REP socket. The Expert Advisor parses the JSON request, executes the appropriate trading operation using MT5's \texttt{OrderSend()} function, and returns a JSON response indicating success or failure with error details.
+Incoming order requests are processed via non-blocking receive on the REP socket. The Expert Advisor parses the JSON request, executes the appropriate trading operation using MT5's \texttt{OrderSend()} function, and returns a JSON response indicating success or failure with error details.
 
 \subsection{Rust Implementation Details}
 
-The Rust application (\texttt{main.rs}) comprised 853 lines of code with the following dependencies (from \texttt{Cargo.toml}):
+The Rust application (\texttt{main.rs}) comprises 853 lines of code with the following dependencies (from \texttt{Cargo.toml}):
 
 \begin{table}[H]
 \centering
@@ -365,7 +329,7 @@ chrono 0.4.43 & Date/time handling \\
 
 \subsubsection{Data Structures}
 
-We defined strongly-typed structures for all message formats, leveraging Serde's derive macros for automatic JSON serialization:
+The application defines strongly-typed structures for all message formats, leveraging Serde's derive macros for automatic JSON serialization:
 
 \begin{lstlisting}[language=Rust, caption=Core Data Structures]
 #[derive(Clone, Debug, Deserialize)]
@@ -386,7 +350,7 @@ struct TickData {
 
 \subsubsection{Asynchronous Channel Architecture}
 
-We employed Tokio's MPSC channels for thread-safe communication between async tasks and the GUI:
+The application employs Tokio's MPSC channels for thread-safe communication between async tasks and the GUI:
 
 \begin{itemize}
     \item \texttt{tick\_channel}: Buffer capacity 100, carries \texttt{TickData} from subscriber to GUI
@@ -396,7 +360,7 @@ We employed Tokio's MPSC channels for thread-safe communication between async ta
 
 \subsubsection{GUI Implementation}
 
-We built the trading interface using egui's immediate-mode paradigm, providing:
+The trading interface is built using egui's immediate-mode paradigm, providing:
 
 \begin{itemize}
     \item Real-time bid/ask price chart with configurable display window
@@ -404,8 +368,7 @@ We built the trading interface using egui's immediate-mode paradigm, providing:
     \item Trade execution controls (market, limit, stop orders)
     \item Position and order management with close/cancel functionality
     \item Historical data download interface (OHLC and tick data)
-    \item Live tick recording to CSV\label{ref:a7}\textsuperscript{\hyperref[sec:a7]{A7}}
-    \item Messages and notifications for recent calls
+    \item Live tick recording to CSV
 \end{itemize}
 
 \subsection{Feature Summary}
@@ -421,14 +384,13 @@ Table~\ref{tab:features} summarizes the complete feature set of the implemented 
 \textbf{Feature} & \textbf{Description} \\
 \midrule
 Live Tick Streaming & Real-time bid/ask data at tick-level granularity with timestamp \\
-Account Monitoring\label{ref:a10}\textsuperscript{\hyperref[sec:a10]{A10}} & Balance, equity, margin, free margin updated on each tick \\
+Account Monitoring & Balance, equity, margin, free margin updated on each tick \\
 Trade Execution & Market buy/sell, limit orders, stop orders with configurable lot size \\
 Position Management & View active positions with real-time P\&L; close positions \\
 Order Management & View pending limit/stop orders; cancel orders \\
 Historical Data & Download OHLC bars or raw tick data as CSV files \\
 Live Recording & Record incoming tick stream to timestamped CSV files \\
 Chart Visualization & Bid/ask lines, position price levels, order execution markers \\
-Messages & Notifications for debugging and recent calls \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -441,15 +403,15 @@ Messages & Notifications for debugging and recent calls \\
 
 \subsection{Benchmark Design}
 
-The validation methodology focused on demonstrating functional correctness and characterizing system performance through the following approaches:
+The validation methodology focuses on demonstrating functional correctness and characterizing system performance through the following approaches:
 
 \subsubsection{Functional Validation}
 
-We validated the system through integration testing within a live MT5 environment connected to an Exness broker Standard-cent live trading account. Validation criteria included:
+The system was validated through integration testing within a live MT5 environment connected to a demo trading account. Validation criteria included:
 
 \begin{itemize}
     \item Successful connection establishment between MQL5 and Rust components
-    \item Accurate tick data transmission with no message loss under normal market conditions\label{ref:a3}\textsuperscript{\hyperref[sec:a3]{A3}}
+    \item Accurate tick data transmission with no message loss under normal market conditions
     \item Correct order execution and response handling
     \item Proper position and order state synchronization
     \item CSV export functionality verification
@@ -457,7 +419,7 @@ We validated the system through integration testing within a live MT5 environmen
 
 \subsubsection{Latency Characterization}
 
-We characterized end-to-end latency by measuring the time delta between tick generation in MT5 and reception in the Rust application. Due to the asynchronous nature of ZeroMQ PUB/SUB, latency measurements captured the combined overhead of:
+End-to-end latency was characterized by measuring the time delta between tick generation in MT5 and reception in the Rust application. Due to the asynchronous nature of ZeroMQ PUB/SUB, latency measurements capture the combined overhead of:
 
 \begin{enumerate}
     \item JSON serialization in MQL5
@@ -470,7 +432,7 @@ We characterized end-to-end latency by measuring the time delta between tick gen
 
 \subsubsection{Throughput Assessment}
 
-We assessed message throughput under varying market activity conditions, from low-volatility periods with sparse tick arrivals to high-volatility sessions with rapid tick sequences.
+Message throughput was assessed under varying market activity conditions, from low-volatility periods with sparse tick arrivals to high-volatility sessions with rapid tick sequences.
 
 \subsection{Results}
 
@@ -510,16 +472,16 @@ Data Buffer & 2000 tick rolling window \\
 
 \subsubsection{Comparison with Native Approaches}
 
-Compared to developing a trading interface purely in MQL5, the proposed methodology offered several advantages:
+Compared to developing a trading interface purely in MQL5, the proposed methodology offers several advantages:
 
 \begin{itemize}
-    \item \textbf{Language Flexibility}: Enabled development in Rust with its safety guarantees and ecosystem
+    \item \textbf{Language Flexibility}: Enables development in Rust with its safety guarantees and ecosystem
     \item \textbf{Extensibility}: External applications can connect to the same ZeroMQ endpoints
     \item \textbf{Modern GUI}: egui provides a more capable UI framework than MQL5's native graphics
     \item \textbf{Data Export}: Straightforward CSV export for external analysis
 \end{itemize}
 
-Trade-offs included the complexity of managing two codebases (MQL5 + Rust) and the serialization overhead of JSON messaging.
+Trade-offs include the complexity of managing two codebases (MQL5 + Rust) and the serialization overhead of JSON messaging.
 
 %% ============================================================================
 %% DISCUSSION
@@ -529,18 +491,18 @@ Trade-offs included the complexity of managing two codebases (MQL5 + Rust) and t
 
 \subsection{Validation Through Demonstration}
 
-The functional trading terminal served as practical validation of the proposed methodology. By implementing a complete set of trading features---from real-time data visualization to order execution---the demonstration established that ZeroMQ provides a viable communication layer between MT5 and external Rust applications. The system's successful operation during live market sessions confirmed the approach's robustness under realistic conditions.
+The functional trading terminal serves as practical validation of the proposed methodology. By implementing a complete set of trading features---from real-time data visualization to order execution---the demonstration establishes that ZeroMQ provides a viable communication layer between MT5 and external Rust applications. The system's successful operation during live market sessions confirms the approach's robustness under realistic conditions.
 
 \subsection{Advantages of the Proposed Approach}
 
-The SUM3API methodology offered several advantages over existing alternatives:
+The SUM3API methodology offers several advantages over existing alternatives:
 
 \begin{enumerate}
-    \item \textbf{Language Independence}: While this implementation used Rust, the ZeroMQ-based architecture supports any language with ZeroMQ bindings, including C++, Java, and Go.
-    \item \textbf{Real-Time Streaming}: The PUB/SUB pattern enabled true real-time tick streaming, unlike polling-based approaches.
-    \item \textbf{Bidirectional Communication}: The dual-socket design supported both data receiving and command sending.
-    \item \textbf{Decoupled Architecture}: The Rust application operated independently of MT5's internal processes, enabling separate deployment and scaling.
-    \item \textbf{Open-Source Availability}: Complete source code availability enabled community review, contribution, and adaptation.
+    \item \textbf{Language Independence}: While this implementation uses Rust, the ZeroMQ-based architecture supports any language with ZeroMQ bindings, including Python, C++, Java, and Go.
+    \item \textbf{Real-Time Streaming}: The PUB/SUB pattern enables true real-time tick streaming, unlike polling-based approaches.
+    \item \textbf{Bidirectional Communication}: The dual-socket design supports both data receiving and command sending.
+    \item \textbf{Decoupled Architecture}: The Rust application operates independently of MT5's internal processes, enabling separate deployment and scaling.
+    \item \textbf{Open-Source Availability}: Complete source code availability enables community review, contribution, and adaptation.
 \end{enumerate}
 
 \subsection{Limitations}
@@ -549,16 +511,15 @@ Several limitations should be acknowledged:
 
 \begin{enumerate}
     \item \textbf{Platform Dependency}: The MQL5 component requires a running MT5 instance, inheriting MT5's platform constraints.
-    \item \textbf{Single Symbol Scope}: The current implementation operated on the chart symbol where the EA was attached; multi-symbol support would require architecture extensions\label{ref:a5}\textsuperscript{\hyperref[sec:a5]{A5}}.
+    \item \textbf{Single Symbol Scope}: The current implementation operates on the chart symbol where the EA is attached; multi-symbol support would require architecture extensions.
     \item \textbf{JSON Overhead}: Binary serialization formats (e.g., MessagePack, Protocol Buffers) could reduce serialization latency.
-    \item \textbf{Local Communication}: The implementation was optimized for localhost communication; network deployment would require additional security considerations.
-    \item \textbf{Error Recovery}: Reconnection logic was basic; production deployments would benefit from enhanced fault tolerance.
-    \item \textbf{Data Persistence}: The software loses live data if closed; the database only stores ``requested'' information and not automatically---data cannot be recovered if connection is lost unless recording is manually toggled on.
+    \item \textbf{Local Communication}: The implementation is optimized for localhost communication; network deployment would require additional security considerations.
+    \item \textbf{Error Recovery}: Reconnection logic is basic; production deployments would benefit from enhanced fault tolerance.
 \end{enumerate}
 
 \subsection{Practical Applications}
 
-The methodology enabled several practical applications:
+The methodology enables several practical applications:
 
 \begin{itemize}
     \item \textbf{Custom Trading Terminals}: Develop trading interfaces tailored to specific workflows
@@ -576,7 +537,7 @@ The methodology enabled several practical applications:
 
 \subsection{Summary of Contributions}
 
-This research presented SUM3API, a methodology for establishing bidirectional real-time communication between MetaTrader 5 and Rust applications using ZeroMQ messaging. The key contributions included:
+This research presented SUM3API, a methodology for establishing bidirectional real-time communication between MetaTrader 5 and Rust applications using ZeroMQ messaging. The key contributions include:
 
 \begin{enumerate}
     \item A reusable MQL5 ZeroMQ wrapper class (\texttt{CZmq}) for socket operations
@@ -585,14 +546,14 @@ This research presented SUM3API, a methodology for establishing bidirectional re
     \item Open-source implementation enabling reproducibility and extension
 \end{enumerate}
 
-The methodology addressed the gap in documented approaches for MT5 data extraction to external high-performance applications, enabling quantitative researchers and algorithmic traders to leverage modern programming tools while maintaining connectivity to MT5's market access infrastructure.
+The methodology addresses the gap in documented approaches for MT5 data extraction to external high-performance applications, enabling quantitative researchers and algorithmic traders to leverage modern programming tools while maintaining connectivity to MT5's market access infrastructure.
 
 \subsection{Open-Source Availability}
 
-All source code, raw \& final documentation, video demonstrations, and examples are available under an MIT open-source license at:
+All source code, documentation, and examples are available under an open-source license at:
 
 \begin{center}
-\url{https://github.com/algorembrant/Rust-ZMQ-MT5}
+\url{https://github.com/algorembrant/SUM3API}
 \end{center}
 
 \subsection{Future Work}
@@ -605,7 +566,7 @@ Future development directions include:
     \item Enhanced fault tolerance with automatic reconnection
     \item Strategy execution framework built on the communication layer
     \item Performance benchmarking with microsecond-precision instrumentation
-    \item Docker containerization for simplified deployment\label{ref:a8}\textsuperscript{\hyperref[sec:a8]{A8}}
+    \item Docker containerization for simplified deployment
 \end{itemize}
 
 %% ============================================================================
@@ -614,120 +575,7 @@ Future development directions include:
 
 \section*{Acknowledgments}
 
-We conducted this research as independent researchers (non-affiliated with professionally known institutions). Developing this study from scratch to final distribution required considerable time, but with the help of xAI's Grok for searching for facts \cite{grok2024}, Google's Gemini Pro \cite{gemini2024}, and Anthropic's Claude \cite{claude2024} inside Google Antigravity \cite{google_antigravity}, we were able to complete this work. We thank all the mentioned companies; if it were not for their masterpiece, we would have had a very hard time completing this work.
-
-We acknowledge the ZeroMQ community for providing the robust messaging library that forms the foundation of this work, and the MQL5 \& Rust community for the excellent async ecosystem enabling this implementation. If it were not for their existence, we would not have had an idea of how to connect these three APIs.
-
-We thank ourselves for having a goal to contribute to the research community rather than presenting a non-implementable approach or complicated methods; for answering one gap; for staying strong despite the unfamiliar challenges; and for the willingness to explore and grow again after backing down.
-
-%% ============================================================================
-%% AUTHOR INFORMATION
-%% ============================================================================
-
-\newpage
-\section*{Author Information}
-\label{sec:author_info}
-
-\begin{center}
-\textbf{Rembrant Oyangoren Albeos}~\href{https://orcid.org/0009-0006-8743-4419}{\includegraphics[height=10pt]{ORCID_icon.png}}
-\end{center}
-
-\noindent\textbf{Affiliation:} Independent Researcher
-
-\noindent\textbf{ORCID:} \url{https://orcid.org/0009-0006-8743-4419}
-
-\noindent\textbf{Email:} algorembrant@gmail.com
-
-\noindent\textbf{First Version:} January 20, 2026
-
-\noindent\textbf{GitHub:} \url{https://github.com/algorembrant/Rust-ZMQ-MT5}
-
-\noindent\textbf{This Version:} January 27, 2026
-
-\noindent\textbf{GitHub:} \url{https://github.com/algorembrant/SUM3API}
-
-%% ============================================================================
-%% APPENDIX
-%% ============================================================================
-
-\appendix
-\section{Supplementary Notes}
-
-This appendix provides additional context and clarifications referenced throughout the main text via superscript annotations.
-
-\subsection{\hyperref[ref:a1]{A1}: Trading Account and Broker Information}
-\label{sec:a1}
-
-We used Exness as the broker with a Standard-cent live trading account. Since a cent-based account was used, all tradable assets have a ``c'' suffix (e.g., XAUUSDc for gold, BTCUSDc for Bitcoin, etc.). This implementation used a live account, not a demo or paper trading account.
-
-\subsection{\hyperref[ref:a2]{A2}: Development Environment Setup}
-\label{sec:a2}
-
-We installed the following applications: Git, Rust (with cargo), Visual Studio C++ Build Tools, MetaTrader 5, and MetaEditor 5. The development was conducted using Google Antigravity (any code editor with terminal access would suffice). The specific versions used are not critical to the implementation.
-
-\subsection{\hyperref[ref:a3]{A3}: Tick Data Accuracy Note}
-\label{sec:a3}
-
-The current implementation has not been compared against other bid/ask formation approaches (dataframes, line chart formations). Therefore, we cannot definitively claim no data loss or perfectly successful extraction. The microsecond-resolution raw bid/ask formation uses a non-fixed-time-interval x-axis; the formation depends on raw up-and-down tick movement count. Thus, the statement ``accurate tick data transmission with no message loss'' applied only ``under normal market conditions.''
-
-\subsection{\hyperref[ref:a4]{A4}: Related Python Project}
-\label{sec:a4}
-
-We have a dedicated Python project for fetching tradable assets (forex, crypto) from an Exness Standard-cent live account. The project is available at GitHub \cite{qrat2025_tradable_assets}.
-
-\subsection{\hyperref[ref:a5]{A5}: Multi-Symbol Support}
-\label{sec:a5}
-
-For the ``Single Symbol Scope'' limitation, there is a way to address this---we have implemented it in previous projects where an EA with a diversification model is attached to one symbol, and can trade different symbols. However, this functionality is kept out of this research study for simplicity. The code for EA with multi-symbol support is publicly available, but not a library. The documentation is available at GitHub \cite{qrat2025_multisymbol_ea}.
-
-\subsection{\hyperref[ref:a6]{A6}: Library Completeness}
-\label{sec:a6}
-
-This is not a complete library comparable to MQL's official Python library, but a library that contains all functionality tackled in the SUM3API system, fully documented and operational.
-
-\subsection{\hyperref[ref:a7]{A7}: Data Persistence Limitation}
-\label{sec:a7}
-
-The software loses live data if closed. The database only stores ``requested'' information and does not automatically persist data. Data cannot be recovered if connection is lost unless the user toggles recording ON continuously.
-
-\subsection{\hyperref[ref:a8]{A8}: Docker Containerization}
-\label{sec:a8}
-
-We have been in software development since mid-November 2025 and have not yet learned Docker. Docker containerization is listed as a future work item.
-
-\subsection{\hyperref[ref:a9]{A9}: Literature Search Methodology}
-\label{sec:a9}
-
-The first version of this research was discovered on January 20, 2026. At the time of writing, it was challenging to find benchmark research papers since limited interest exists in binding MT5's API using a ZMQ bridge to other programming languages such as Rust, Go, C++, or Java (creating a combination of 3 APIs).
-
-We searched across the internet using nine leading AI platforms: Grok \cite{grok2024}, Gemini \cite{gemini2024}, Claude \cite{claude2024}, ChatGPT \cite{chatgpt2024}, Microsoft Copilot \cite{mscopilot2024}, Perplexity \cite{perplexity2024}, Baidu (Ernie Bot) \cite{ernie2024}, DeepSeek \cite{deepseek2024}, and Qwen \cite{qwen2024}. Some AI responses hallucinated, suggesting a combination of 2 APIs instead of strictly 3; these were later clarified and confirmed that no prior public projects had implemented this exact combination.
-
-We also searched four scholarly libraries: arXiv \cite{arxiv}, Google Scholar \cite{googlescholar}, SSRN \cite{ssrn}, and Baidu Scholar \cite{baiduxueshu}. The lack of literature suggests that this study's approach---specifically using MT5's MQL5 API to fetch live-trading data feed from connected brokers, bound to ZMQ, bridging to other programming languages---is not yet popular or well-explored.
-
-Existing related projects include:
-\begin{itemize}
-    \item ZMQ binding to MQL: dingmaotu/mql-zmq \cite{mqlzmq2020}
-    \item ZMQ binding to Rust: zeromq/zmq.rs \cite{zmqrs2024}
-    \item ZMQ binding between MQL and JavaScript: EricSchles/bindings-mql4-5 \cite{zmqmqljs2019}
-\end{itemize}
-
-However, no prior work combined all three: MQL5, ZeroMQ, and Rust in a unified API bridge.
-
-\subsection{\hyperref[ref:a10]{A10}: Security Advantage - No Sensitive Credentials Required}
-\label{sec:a10}
-
-Unlike MT5's Python API where developers must explicitly define sensitive variables such as account ID, account password, and account server in their code, the MQL5 \& ZeroMQ \& Rust library does not require such sensitive information to be exposed. The Expert Advisor running inside MT5 already has authenticated access to the trading account, and thus can fetch account information (balance, equity, free and used margin) and execute trading operations (placing orders, closing positions) without requiring credentials to be passed through the communication layer.
-
-This architectural design provides several security advantages:
-
-\begin{itemize}
-    \item \textbf{No Credential Exposure}: Account credentials never leave the MT5 environment and are not transmitted over ZeroMQ sockets
-    \item \textbf{Reduced Attack Surface}: External applications cannot directly authenticate to trading accounts; they can only communicate with an already-authenticated MT5 instance
-    \item \textbf{Separation of Concerns}: Authentication is handled by MT5's native security mechanisms \cite{mt5_security}, while the external application focuses solely on data consumption and command issuance
-    \item \textbf{Localhost Communication}: The default configuration uses localhost TCP sockets, preventing network-based credential interception
-\end{itemize}
-
-This design is particularly relevant for the features described in Table~\ref{tab:features}, specifically Account Monitoring and Trade Execution, where sensitive operations are performed without requiring credential transmission.
+The author acknowledges the ZeroMQ community for providing the robust messaging library that forms the foundation of this work, and the Rust community for the excellent async ecosystem enabling this implementation.
 
 %% ============================================================================
 %% REFERENCES
