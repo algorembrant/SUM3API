@@ -14,12 +14,14 @@
 \usepackage{textcomp}
 \usepackage{xcolor}
 \usepackage{listings}
-\usepackage{hyperref}
+\usepackage[backref]{hyperref}
 \usepackage{booktabs}
 \usepackage{multirow}
 \usepackage{array}
 \usepackage{float}
 \usepackage{url}
+
+
 
 % Code listing settings
 \lstset{
@@ -231,7 +233,7 @@ The Expert Advisor executes on an MT5 chart and performs continuous data extract
     \item \textbf{OnDeinit()}: Graceful shutdown of ZeroMQ sockets and context
 \end{itemize}
 
-All metadata are fetched automatically, independent of the ticker or symbol attached to the Expert Advisor. For this implementation, the EA can be attached to any chart (e.g., XAUUSDc or BTCUSDc) without modifying the code\label{ref:a1}\textsuperscript{\hyperref[sec:a1]{A1}}.
+All metadata are fetched automatically, independent of the ticker or symbol attached to the Expert Advisor. For this implementation, the EA can be attached to any chart (e.g., XAUUSDc or BTCUSDc) without modifying the code\label{ref:a1}\textsuperscript{\hyperref[sec:a1]{A1}}\label{ref:a4}\textsuperscript{\hyperref[sec:a4]{A4}} \cite{qrat2025_tradable_assets}.
 
 \subsection{Rust Application Architecture}
 
@@ -419,7 +421,7 @@ Table~\ref{tab:features} summarizes the complete feature set of the implemented 
 \textbf{Feature} & \textbf{Description} \\
 \midrule
 Live Tick Streaming & Real-time bid/ask data at tick-level granularity with timestamp \\
-Account Monitoring & Balance, equity, margin, free margin updated on each tick \\
+Account Monitoring\label{ref:a10}\textsuperscript{\hyperref[sec:a10]{A10}} & Balance, equity, margin, free margin updated on each tick \\
 Trade Execution & Market buy/sell, limit orders, stop orders with configurable lot size \\
 Position Management & View active positions with real-time P\&L; close positions \\
 Order Management & View pending limit/stop orders; cancel orders \\
@@ -547,7 +549,7 @@ Several limitations should be acknowledged:
 
 \begin{enumerate}
     \item \textbf{Platform Dependency}: The MQL5 component requires a running MT5 instance, inheriting MT5's platform constraints.
-    \item \textbf{Single Symbol Scope}: The current implementation operated on the chart symbol where the EA was attached; multi-symbol support would require architecture extensions\label{ref:a5}\textsuperscript{\hyperref[sec:a5]{A5}}.
+    \item \textbf{Single Symbol Scope}: The current implementation operated on the chart symbol where the EA was attached; multi-symbol support would require architecture extensions\label{ref:a5}\textsuperscript{\hyperref[sec:a5]{A5}} \cite{qrat2025_multisymbol_ea}.
     \item \textbf{JSON Overhead}: Binary serialization formats (e.g., MessagePack, Protocol Buffers) could reduce serialization latency.
     \item \textbf{Local Communication}: The implementation was optimized for localhost communication; network deployment would require additional security considerations.
     \item \textbf{Error Recovery}: Reconnection logic was basic; production deployments would benefit from enhanced fault tolerance.
@@ -556,7 +558,7 @@ Several limitations should be acknowledged:
 
 \subsection{Practical Applications}
 
-The methodology enabled several practical applications\label{ref:a4}\textsuperscript{\hyperref[sec:a4]{A4}}:
+The methodology enabled several practical applications:
 
 \begin{itemize}
     \item \textbf{Custom Trading Terminals}: Develop trading interfaces tailored to specific workflows
@@ -612,7 +614,7 @@ Future development directions include:
 
 \section*{Acknowledgments}
 
-We conducted this research as independent researchers (non-affiliated with professionally known institutions). Developing this study from scratch to final distribution required considerable time, but with the help of xAI's Grok for searching for facts \cite{grok2024}, Google's Gemini Pro \cite{gemini2024}, and Anthropic's Claude \cite{claude2024} inside Google Antigravity, we were able to complete this work. We thank all the mentioned companies; if it were not for their masterpiece, we would have had a very hard time completing this work.
+We conducted this research as independent researchers (non-affiliated with professionally known institutions). Developing this study from scratch to final distribution required considerable time, but with the help of xAI's Grok for searching for facts \cite{grok2024}, Google's Gemini Pro \cite{gemini2024}, and Anthropic's Claude \cite{claude2024} inside Google Antigravity \cite{google_antigravity}, we were able to complete this work. We thank all the mentioned companies; if it were not for their masterpiece, we would have had a very hard time completing this work.
 
 We acknowledge the ZeroMQ community for providing the robust messaging library that forms the foundation of this work, and the MQL5 \& Rust community for the excellent async ecosystem enabling this implementation. If it were not for their existence, we would not have had an idea of how to connect these three APIs.
 
@@ -671,12 +673,12 @@ The current implementation has not been compared against other bid/ask formation
 \subsection{\hyperref[ref:a4]{A4}: Related Python Project}
 \label{sec:a4}
 
-We have a dedicated Python project for fetching tradable assets (forex, crypto) from an Exness Standard-cent live account. The project is available at: \url{https://github.com/algorembrant/QRAT2025/blob/main/Python\%20Folder/Ticker\%20Quotes\%20Fetching/Quotes\%20of\%20all\%20tradable\%20assets\%20in\%20Exness.ipynb}
+We have a dedicated Python project for fetching tradable assets (forex, crypto) from an Exness Standard-cent live account. The project is available at GitHub \cite{qrat2025_tradable_assets}.
 
 \subsection{\hyperref[ref:a5]{A5}: Multi-Symbol Support}
 \label{sec:a5}
 
-For the ``Single Symbol Scope'' limitation, there is a way to address this---we have implemented it in previous projects where an EA attached to one symbol can trade different symbols. However, this functionality is kept out of this research study for simplicity. The code for multi-symbol support is not publicly available; interested parties may contact us. The reason for keeping it private is that it implements an automated algorithmic trading bot with a diversification model. Documentation for that EA is available at: \url{https://github.com/algorembrant/QRAT2025/blob/main/Research\%20Papers/The\%203HTMOSDSDT.rp2}
+For the ``Single Symbol Scope'' limitation, there is a way to address this---we have implemented it in previous projects where an EA with a diversification model is attached to one symbol, and can trade different symbols. However, this functionality is kept out of this research study for simplicity. The code for EA with multi-symbol support is publicly available, but not a library. The documentation is available at GitHub \cite{qrat2025_multisymbol_ea}.
 
 \subsection{\hyperref[ref:a6]{A6}: Library Completeness}
 \label{sec:a6}
@@ -710,6 +712,22 @@ Existing related projects include:
 \end{itemize}
 
 However, no prior work combined all three: MQL5, ZeroMQ, and Rust in a unified API bridge.
+
+\subsection{\hyperref[ref:a10]{A10}: Security Advantage - No Sensitive Credentials Required}
+\label{sec:a10}
+
+Unlike MT5's Python API where developers must explicitly define sensitive variables such as account ID, account password, and account server in their code, the MQL5 \& ZeroMQ \& Rust library does not require such sensitive information to be exposed. The Expert Advisor running inside MT5 already has authenticated access to the trading account, and thus can fetch account information (balance, equity, free and used margin) and execute trading operations (placing orders, closing positions) without requiring credentials to be passed through the communication layer.
+
+This architectural design provides several security advantages:
+
+\begin{itemize}
+    \item \textbf{No Credential Exposure}: Account credentials never leave the MT5 environment and are not transmitted over ZeroMQ sockets
+    \item \textbf{Reduced Attack Surface}: External applications cannot directly authenticate to trading accounts; they can only communicate with an already-authenticated MT5 instance
+    \item \textbf{Separation of Concerns}: Authentication is handled by MT5's native security mechanisms, while the external application focuses solely on data consumption and command issuance
+    \item \textbf{Localhost Communication}: The default configuration uses localhost TCP sockets, preventing network-based credential interception
+\end{itemize}
+
+This design is particularly relevant for the features described in Table~\ref{tab:features}, specifically Account Monitoring and Trade Execution, where sensitive operations are performed without requiring credential transmission.
 
 %% ============================================================================
 %% REFERENCES

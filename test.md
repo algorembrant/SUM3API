@@ -1,0 +1,2 @@
+unlike MT5's Python API where you must define variable first such as account id, account password, and account server, the MQL5 & ZweroMQ & Rust library doest not require sensitive information to fetch account information such as balance, equity, free & used margin or placing orders or as what tackled in TABLE II
+SYSTEM FEATURE SUMMARY.
