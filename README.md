@@ -1,5 +1,5 @@
 **Author:** <br>
-Rembrant Oyangoren Albeos<br><br>
+Rembrant Oyangoren Albeos [<img width="16" height="16" alt="image" src="https://github.com/user-attachments/assets/4603823b-02db-4159-9999-93aa420bd2b6" />](https://orcid.org/0009-0006-8743-4419)<br><br>
 **Title:** <br>
 *SUM3API: Using Rust, ZeroMQ, and MetaQuotes
 Language (MQL5) API Combination to Extract,
@@ -7,6 +7,8 @@ Communicate, and Externally Project Financial
 Data from MetaTrader 5 (MT5)* <br><br>
 **Abstract**:<br>
 MetaTrader 5 (MT5), when connected to preferred exchanges or brokers, supports automated algorithmic trading via Expert Advisors (EAs) written in MetaQuotes Language (MQL5). While MetaQuotes Ltd. provides an official Python integration package, publicly documented methods for internally extracting and externally projecting MT5 financial data remain limited. To address this gap, we implemented a novel approach that bridges MQL5 and Rust via ZeroMQ publisher– subscriber and request–reply bindings. This benchmark-based methodology enables quantitative researchers, feature engineers, and algorithmic traders to develop trading systems leveraging MT5 data feeds using Rust, thereby bypassing the limitations inherent to pure MQL5 Expert Advisors. The methodology was validated through integration within a functional trad- ing terminal application demonstrating low-latency capabilities including: real-time account information monitoring (balance, equity, free and used margin), downloadable historical data requests (OHLC bars and raw tick data), downloadable forward data streaming (live tick recording), trade execution controls (market, limit, and stop orders with lot sizing and cancellation), messaging and notifications for debugging & recent calls, and a live microsecond-resolution raw tick-level bid/ask price formation chart.<br><br>
+**Keywords:**<br>
+MetaTrader 5, ZeroMQ, Rust, MetaQuotes Language 5, algorithmic trading, inter-process communication, financial data extraction, low-latency systems<br><br>
 
 ## Simple SUM3API System Framework
 <img width="303" height="618" alt="image" src="https://github.com/user-attachments/assets/802eba47-1c7e-4618-aadc-67b1189db5ab" />
