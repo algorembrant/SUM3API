@@ -147,7 +147,7 @@ This research contributes to the algorithmic trading community by providing an o
 
 MetaTrader 5 represents MetaQuotes Software Corp.'s flagship trading platform, succeeding MetaTrader 4 with enhanced multi-asset capabilities, an improved strategy testing environment, and the MQL5 programming language \cite{metaquotes2024}. The MQL5 language provides comprehensive APIs for market data access, order management, technical indicator development, and graphical user interface construction within the MT5 terminal. However, MQL5's execution remains confined to the MT5 runtime environment, limiting integration with external systems and modern development ecosystems.
 
-The official MetaTrader 5 Python package, introduced by MetaQuotes, enables Python scripts to connect to running MT5 terminals for data retrieval and order submission \cite{metaquotes_python2024}. While this integration expanded MT5's accessibility to the Python data science ecosystem, the package operates through an inter-process communication mechanism that introduces latency and does not support real-time tick streaming with microsecond-level timestamps.
+The official MetaTrader 5 Python package, introduced by MetaQuotes, enables Python scripts to connect to running MT5 terminals for data retrieval and order submission \cite{metaquotes_python2024}. While this integration expanded MT5's accessibility to the Python data science ecosystem, the package operates through an inter-process communication mechanism that typically relies on polling or synchronous requests, which may present challenges for use cases requiring microsecond-resolution real-time tick streaming compared to asynchronous push-based models.
 
 \subsection{ZeroMQ for Financial Applications}
 
@@ -199,6 +199,8 @@ The proposed SUM3API system implements a dual-socket ZeroMQ architecture connect
 
 This separation of concerns aligns messaging patterns with data characteristics: high-frequency, unidirectional tick data employs the fire-and-forget semantics of PUB/SUB, while order execution requiring acknowledgment uses synchronous REQ/REP communication.
 
+Fig.~1 illustrates the complete system framework and data flow. The architecture is divided into three layers: the MetaTrader 5 layer, the ZeroMQ Transport layer, and the Rust Application layer. In the MetaTrader 5 layer, the \texttt{Zmq.mqh} wrapper facilitates communication for the \texttt{ZmqPublisher.mq5} Expert Advisor, which utilizes \texttt{libzmq.dll} and \texttt{libsodium.dll}. This layer connects to the ZeroMQ Transport layer via two sockets: a PUB Socket on port 5555 for broadcasting Tick Data, and a REP Socket on port 5556 for handling Order Requests and Responses. The Rust Application layer mirrors this setup with a SubSocket for receiving ticks and a ReqSocket for sending orders, both feeding into the \texttt{egui}-based Trading GUI.
+
 \subsection{MQL5 Component Design}
 
 The MQL5 component consists of two primary artifacts:
@@ -223,7 +225,7 @@ public:
 };
 \end{lstlisting}
 
-The wrapper imports functions from \texttt{libzmq.dll} using MQL5's native DLL import mechanism, exposing context creation (\texttt{zmq\_ctx\_new}), socket operations (\texttt{zmq\_socket}, \texttt{zmq\_bind}, \texttt{zmq\_connect}), and message transmission (\texttt{zmq\_send}, \texttt{zmq\_recv}). The DLLs require the latest Visual C++ runtime (2015).
+The wrapper imports functions from \texttt{libzmq.dll} using MQL5's native DLL import mechanism, exposing context creation (\texttt{zmq\_ctx\_new}), socket operations (\texttt{zmq\_socket}, \texttt{zmq\_bind}, \texttt{zmq\_connect}), and message transmission (\texttt{zmq\_send}, \texttt{zmq\_recv}). The DLLs require the latest Visual C++ runtime (2015)\label{ref:a11}\textsuperscript{\hyperref[sec:a11]{A11}}.
 
 \subsubsection{Expert Advisor (ZmqPublisher.mq5)}
 
@@ -451,7 +453,7 @@ We validated the system through integration testing within a live MT5 environmen
 
 \begin{itemize}
     \item Successful connection establishment between MQL5 and Rust components
-    \item Accurate tick data transmission with no message loss under normal market conditions\label{ref:a3}\textsuperscript{\hyperref[sec:a3]{A3}}
+    \item Accurate tick data transmission with no message loss under normal market conditions\phantomsection\label{ref:a3}\textsuperscript{\hyperref[sec:a3]{A3}}
     \item Correct order execution and response handling
     \item Proper position and order state synchronization
     \item CSV export functionality verification
@@ -719,7 +721,12 @@ This architectural design provides several security advantages:
     \item \textbf{Localhost Communication}: The default configuration uses localhost TCP sockets, preventing network-based credential interception
 \end{itemize}
 
-This design is particularly relevant for the features described in Table~\ref{tab:features}, specifically Account Monitoring and Trade Execution, where sensitive operations are performed without requiring credential transmission.
+This is particularly relevant for the features described in Table~\ref{tab:features}, specifically Account Monitoring and Trade Execution, where sensitive operations are performed without requiring credential transmission.
+
+\subsection{\hyperref[ref:a11]{A11}: Library Dependencies}
+\label{sec:a11}
+
+The core dependencies for the MQL5 integration, \texttt{libzmq} and \texttt{libsodium}, are open-source libraries available for download from their official repositories. \texttt{libzmq} can be obtained from \url{https://zeromq.org}, and \texttt{libsodium} is available at \url{https://libsodium.org}. Users should ensure they download the versions compatible with their operating system architecture (typically 64-bit for modern MT5 installations).
 
 %% ============================================================================
 %% REFERENCES
