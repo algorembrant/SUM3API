@@ -1,4 +1,33 @@
-# Complete End-to-End System Architecture: MQL5 ↔ ZeroMQ ↔ Rust for SUM3API
+**Author:** <br>
+Rembrant Oyangoren Albeos [<img width="16" height="16" alt="image" src="https://github.com/user-attachments/assets/4603823b-02db-4159-9999-93aa420bd2b6" />](https://orcid.org/0009-0006-8743-4419)<br><br>
+**Title:** <br>
+*SUM3API: Using Rust, ZeroMQ, and MetaQuotes
+Language (MQL5) API Combination to Extract,
+Communicate, and Externally Project Financial
+Data from MetaTrader 5 (MT5)* <br><br>
+**Abstract**:<br>
+MetaTrader 5 (MT5), when connected to preferred exchanges or brokers, supports automated algorithmic trading via Expert Advisors (EAs) written in MetaQuotes Language (MQL5). While MetaQuotes Ltd. provides an official Python integration package, publicly documented methods for internally extracting and externally projecting MT5 financial data remain limited. To address this gap, we implemented a novel approach that bridges MQL5 and Rust via ZeroMQ publisher– subscriber and request–reply bindings. This benchmark-based methodology enables quantitative researchers, feature engineers, and algorithmic traders to develop trading systems leveraging MT5 data feeds using Rust, thereby bypassing the limitations inherent to pure MQL5 Expert Advisors. The methodology was validated through integration within a functional trad- ing terminal application demonstrating low-latency capabilities including: real-time account information monitoring (balance, equity, free and used margin), downloadable historical data requests (OHLC bars and raw tick data), downloadable forward data streaming (live tick recording), trade execution controls (market, limit, and stop orders with lot sizing and cancellation), messaging and notifications for debugging & recent calls, and a live microsecond-resolution raw tick-level bid/ask price formation chart.<br><br>
+**Keywords:**<br>
+MetaTrader 5, ZeroMQ, Rust, MetaQuotes Language 5, algorithmic trading, inter-process communication, financial data extraction, low-latency systems<br><br>
+
+## Simple SUM3API System Framework
+<img width="303" height="618" alt="image" src="https://github.com/user-attachments/assets/802eba47-1c7e-4618-aadc-67b1189db5ab" />
+
+
+<br><br><br><br>
+## A proof of the SUM3API System Framework demonstration through a Software (Trading Terminal)
+<img width="1187" height="634" alt="622566837_1124349333017733_1244258009559375965_n (1)" src="https://github.com/user-attachments/assets/6c3c9244-413b-4530-85b3-17ed42d590af" />
+<br><br>
+
+_This is what it looked like from the perspective of a ‘stress-Following-this-GUIDE-tester.’ Following this [GUIDE](https://github.com/algorembrant/SUM3API/blob/main/A%20GUIDE%20to%20open%20SUM3API%20software%20(trading%20terminal).pdf) from the very start to the finish._
+
+<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/f98bb039-c676-47c1-a972-c94cc2a13584" />
+
+<br><br><br><br>
+The following pages will cover **Complete End-to-End System Architecture**, **MQL5-ZMQ Wrapper library**, and **RUST-ZMQ Wrapper library** for the SUM3API System.
+
+<br><br><br><br>
+# The Complete End-to-End System Architecture: MQL5 ↔ ZeroMQ ↔ Rust for SUM3API
 
 **Version**: 2.0.0  
 **Last Updated**: 2026-01-28  
