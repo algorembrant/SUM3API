@@ -84,7 +84,7 @@
 \begin{figure}[H]
     \centering
     \includegraphics[width=.70\linewidth]{image.png}
-    \caption{SUM3API System Framework}
+    \caption{\hyperref[sec:fig1_text_ref]{SUM3API System Framework}}
     \label{fig:placeholder}
 \end{figure}
 
@@ -197,9 +197,9 @@ The proposed SUM3API system implements a dual-socket ZeroMQ architecture connect
     \item \textbf{Order Execution Channel (REQ/REP)}: A request--reply socket pair on TCP port 5556 for bidirectional command execution including trade orders, position management, and historical data requests.
 \end{enumerate}
 
-This separation of concerns aligns messaging patterns with data characteristics: high-frequency, unidirectional tick data employs the fire-and-forget semantics of PUB/SUB, while order execution requiring acknowledgment uses synchronous REQ/REP communication.
+This separation of concerns aligns messaging patterns with data characteristics: high-frequency, unidirectional tick data employs the fire-and-forget semantics of PUB/SUB, while order execution requiring acknowledgment uses synchronous REQ/REP communication. \\[0.2em]
 
-Fig.~1 illustrates the complete system framework and data flow. The architecture is divided into three layers: the MetaTrader 5 layer, the ZeroMQ Transport layer, and the Rust Application layer. In the MetaTrader 5 layer, the \texttt{Zmq.mqh} wrapper facilitates communication for the \texttt{ZmqPublisher.mq5} Expert Advisor, which utilizes \texttt{libzmq.dll} and \texttt{libsodium.dll}. This layer connects to the ZeroMQ Transport layer via two sockets: a PUB Socket on port 5555 for broadcasting Tick Data, and a REP Socket on port 5556 for handling Order Requests and Responses. The Rust Application layer mirrors this setup with a SubSocket for receiving ticks and a ReqSocket for sending orders, both feeding into the \texttt{egui}-based Trading GUI.
+The \phantomsection\label{sec:fig1_text_ref}\hyperref[fig:placeholder]{Fig. 1} illustrates the complete system framework and data flow. The architecture is divided into three layers: the MetaTrader 5 layer, the ZeroMQ Transport layer, and the Rust Application layer. In the MetaTrader 5 layer, the \texttt{Zmq.mqh} wrapper facilitates communication for the \texttt{ZmqPublisher.mq5} Expert Advisor, which utilizes \texttt{libzmq.dll} and \texttt{libsodium.dll}. This layer connects to the ZeroMQ Transport layer via two sockets: a PUB Socket on port 5555 for broadcasting Tick Data, and a REP Socket on port 5556 for handling Order Requests and Responses. The Rust Application layer mirrors this setup with a SubSocket for receiving ticks and a ReqSocket for sending orders, both feeding into the \texttt{egui}-based Trading GUI.
 
 \subsection{MQL5 Component Design}
 
@@ -225,7 +225,7 @@ public:
 };
 \end{lstlisting}
 
-The wrapper imports functions from \texttt{libzmq.dll} using MQL5's native DLL import mechanism, exposing context creation (\texttt{zmq\_ctx\_new}), socket operations (\texttt{zmq\_socket}, \texttt{zmq\_bind}, \texttt{zmq\_connect}), and message transmission (\texttt{zmq\_send}, \texttt{zmq\_recv}). The DLLs require the latest Visual C++ runtime (2015)\label{ref:a11}\textsuperscript{\hyperref[sec:a11]{A11}}.
+The wrapper imports functions from \texttt{libzmq.dll} using MQL5's native DLL import mechanism, exposing context creation (\texttt{zmq\_ctx\_new}), socket operations (\texttt{zmq\_socket}, \texttt{zmq\_bind}, \texttt{zmq\_connect}), and message transmission (\texttt{zmq\_send}, \texttt{zmq\_recv}). The DLLs require the latest Visual C++ runtime (2015).
 
 \subsubsection{Expert Advisor (ZmqPublisher.mq5)}
 
@@ -315,7 +315,7 @@ All inter-process communication employed JSON serialization for message payloads
 
 \subsection{MQL5 Implementation Details}
 
-The MQL5 implementation totaled approximately 600 lines of code across four files: the \texttt{Zmq.mqh} wrapper (144 lines), the \texttt{ZmqPublisher.mq5} Expert Advisor (451 lines), and the \texttt{libsodium.dll \& libzmq.dll} DLL files.
+The MQL5 implementation totaled approximately 600 lines of code across four files: the \texttt{Zmq.mqh} wrapper (144 lines), the \texttt{ZmqPublisher.mq5} Expert Advisor (451 lines), and the \texttt{libsodium.dll \& libzmq.dll} DLL files\label{ref:a11}\textsuperscript{\hyperref[sec:a11]{A11}}.
 
 \subsubsection{ZeroMQ Library Integration}
 
@@ -583,7 +583,7 @@ The methodology addressed the gap in documented approaches for MT5 data extracti
 
 \subsection{Open-Source Availability}
 
-All source code, markdown libraries, documentations, and examples are available under an MIT open-source license at:
+All source code, complete end-to-end system architecture, MQL5-ZMQ \& RUST-ZMQ wrapper libraries for the SUM3API's system, documentations, and examples are available under an MIT open-source license at:
 
 \begin{center}
 \url{https://github.com/algorembrant/SUM3API}
@@ -605,7 +605,8 @@ Future development directions include:
 %% ============================================================================
 %% ACKNOWLEDGMENTS
 %% ============================================================================
-\newpage
+
+
 \section*{Acknowledgments}
 
 We conducted this research as independent researchers (non-affiliated with professionally known institutions). Developing this study from scratch to final distribution required considerable time, but with the help of xAI's Grok for searching for facts \cite{grok2024}, Google's Gemini Pro \cite{gemini2024}, and Anthropic's Claude \cite{claude2024} inside Google Antigravity \cite{google_antigravity}, we were able to complete this work. We thank all the mentioned companies; if it were not for their masterpiece, we would have had a very hard time completing this work.
@@ -618,7 +619,7 @@ We thank ourselves for having a goal to contribute to the research community rat
 %% AUTHOR INFORMATION
 %% ============================================================================
 
-\newpage
+
 \section*{Author Information}
 \label{sec:author_info}
 
@@ -726,7 +727,7 @@ This is particularly relevant for the features described in Table~\ref{tab:featu
 \subsection{\hyperref[ref:a11]{A11}: Library Dependencies}
 \label{sec:a11}
 
-The core dependencies for the MQL5 integration, \texttt{libzmq} and \texttt{libsodium}, are open-source libraries available for download from their official repositories. \texttt{libzmq} can be obtained from \url{https://zeromq.org}, and \texttt{libsodium} is available at \url{https://libsodium.org}. Users should ensure they download the versions compatible with their operating system architecture (typically 64-bit for modern MT5 installations).
+The core dependencies for the MQL5 integration, \texttt{libzmq} and \texttt{libsodium}, are open-source libraries available for download from their official repositories. \texttt{libzmq} can be obtained from \cite{libzmq_dll}, and \texttt{libsodium} is available at \cite{libsodium_dll}. Users should ensure they download the versions compatible with their operating system architecture (typically 64-bit for modern MT5 installations).
 
 %% ============================================================================
 %% REFERENCES
