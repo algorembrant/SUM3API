@@ -26,15 +26,50 @@
 
 
 % Code listing settings
-\lstset{
-    basicstyle=\ttfamily\footnotesize,
-    breaklines=true,
-    frame=single,
-    numbers=left,
-    numberstyle=\tiny,
-    tabsize=2,
-    captionpos=b
+% Colors for code listings
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{0.99,0.99,0.99}
+
+% Rust language definition
+\lstdefinelanguage{Rust}{
+  keywords={fn, let, mut, loop, match, if, else, while, for, in, return, struct, enum, impl, use, pub, mod, crate, super, self, Self, true, false, async, await, move, type, trait, where, unsafe},
+  keywordstyle=\color{magenta},
+  ndkeywords={u8, u16, u32, u64, i8, i16, i32, i64, f32, f64, usize, isize, bool, str, String, Vec, Option, Result, Some, None, Ok, Err, Box},
+  ndkeywordstyle=\color{red},
+  sensitive=true,
+  comment=[l]{//},
+  morecomment=[s]{/*}{*/},
+  commentstyle=\color{codegreen},
+  stringstyle=\color{codepurple},
+  morestring=[b]",
 }
+
+% Code listing settings
+\lstdefinestyle{mystyle}{
+    backgroundcolor=\color{backcolour},
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{magenta},
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codepurple},
+    basicstyle=\ttfamily\footnotesize,
+    breakatwhitespace=false,
+    breaklines=true,
+    captionpos=b,
+    keepspaces=true,
+    numbers=left,
+    numbersep=10pt,
+    xleftmargin=2em,
+    framexleftmargin=2em,
+    showspaces=false,
+    showstringspaces=false,
+    showtabs=false,
+    tabsize=2,
+    frame=single
+}
+
+\lstset{style=mystyle}
 
 % Hyperref settings with backref for bidirectional citation navigation
 \hypersetup{
@@ -408,7 +443,7 @@ We built the trading interface using egui's immediate-mode paradigm, providing:
     \item Trade execution controls (market, limit, stop orders)
     \item Position and order management with close/cancel functionality
     \item Historical data download interface (OHLC and tick data)
-    \item Live tick recording to CSV\label{ref:a7}\textsuperscript{\hyperref[sec:a7]{A7}}
+    \item Live tick recording to CSV
     \item Messages and notifications for recent calls
 \end{itemize}
 
@@ -424,7 +459,7 @@ Table~\ref{tab:features} summarizes the complete feature set of the implemented 
 \toprule
 \textbf{Feature} & \textbf{Description} \\
 \midrule
-Live Tick Streaming & Real-time bid/ask data at tick-level granularity with timestamp \\
+Live Tick Streaming\label{ref:a7}\textsuperscript{\hyperref[sec:a7]{A7}} & Real-time bid/ask data at tick-level granularity with timestamp \\
 Account Monitoring\label{ref:a10}\textsuperscript{\hyperref[sec:a10]{A10}} & Balance, equity, margin, free margin updated on each tick \\
 Trade Execution & Market buy/sell, limit orders, stop orders with configurable lot size \\
 Position Management & View active positions with real-time P\&L; close positions \\
